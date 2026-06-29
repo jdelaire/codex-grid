@@ -39,6 +39,18 @@ Open:
 http://127.0.0.1:8765/
 ```
 
+Quick launch on macOS:
+
+```bash
+./launch.sh
+```
+
+Override defaults:
+
+```bash
+HOST=127.0.0.1 PORT=9000 CODEX_BIN=codex ./launch.sh
+```
+
 The server talks to Codex through:
 
 ```bash
