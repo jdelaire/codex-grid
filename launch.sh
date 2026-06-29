@@ -7,13 +7,67 @@ HOST="${HOST:-127.0.0.1}"
 PORT="${PORT:-8765}"
 CODEX_BIN="${CODEX_BIN:-codex}"
 URL="http://${HOST}:${PORT}/"
+THREADS_URL="http://${HOST}:${PORT}/api/threads?activeMinutes=5&maxAgeHours=12"
 
-if command -v lsof >/dev/null 2>&1 && lsof -nP -iTCP:"${PORT}" -sTCP:LISTEN >/dev/null 2>&1; then
-  echo "Codims already running at ${URL}"
-  if command -v open >/dev/null 2>&1; then
-    open "${URL}"
+port_is_listening() {
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -nP -iTCP:"${PORT}" -sTCP:LISTEN >/dev/null 2>&1
+    return
   fi
-  exit 0
+
+  if command -v python3 >/dev/null 2>&1; then
+    python3 - "${HOST}" "${PORT}" >/dev/null 2>&1 <<'PY'
+import socket
+import sys
+
+with socket.create_connection((sys.argv[1], int(sys.argv[2])), timeout=1):
+    pass
+PY
+    return
+  fi
+
+  return 1
+}
+
+is_codims_server() {
+  local body
+
+  if command -v curl >/dev/null 2>&1; then
+    body="$(curl -fsS --max-time 2 "${THREADS_URL}" 2>/dev/null || true)"
+  elif command -v python3 >/dev/null 2>&1; then
+    body="$(python3 - "${THREADS_URL}" 2>/dev/null <<'PY' || true
+import sys
+import urllib.request
+
+with urllib.request.urlopen(sys.argv[1], timeout=2) as response:
+    sys.stdout.buffer.write(response.read(1048576))
+PY
+)"
+  else
+    return 1
+  fi
+
+  case "${body}" in
+    *'"source": "codex_app_server"'*|*'"source":"codex_app_server"'*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+if port_is_listening; then
+  if is_codims_server; then
+    echo "Codims already running at ${URL}"
+    if command -v open >/dev/null 2>&1; then
+      open "${URL}"
+    fi
+    exit 0
+  fi
+
+  echo "Port ${PORT} is already in use by another service." >&2
+  exit 1
 fi
 
 if ! command -v python3 >/dev/null 2>&1; then
