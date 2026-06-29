@@ -369,12 +369,11 @@ def read_thread_lifecycle(client, thread_id):
         result = client.request(
             "thread/read", {"threadId": thread_id, "includeTurns": True}
         )
-    except (AppServerError, OSError, ValueError):
+        thread = result.get("thread", {}) if isinstance(result, dict) else {}
+        completed, terminal = latest_turn_lifecycle(thread)
+        _, last_response = extract_thread_prompt_and_response(thread)
+    except (AppServerError, OSError, ValueError, TypeError, AttributeError):
         return False, False, NO_RESPONSE_CAPTURED
-
-    thread = result.get("thread", {}) if isinstance(result, dict) else {}
-    completed, terminal = latest_turn_lifecycle(thread)
-    _, last_response = extract_thread_prompt_and_response(thread)
     return completed, terminal, snippet_text(last_response)
 
 

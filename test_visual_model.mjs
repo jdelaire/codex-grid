@@ -199,6 +199,13 @@ assert.deepEqual(
   activeOnlyGroups[0].parentGroups[0].children.map((thread) => thread.id),
   ["child-a"],
 );
+assert.equal(
+  handoffShouldAnimate(
+    activeOnlyGroups[0].parentGroups[0],
+    activeOnlyGroups[0].parentGroups[0].children[0],
+  ),
+  true,
+);
 assert.deepEqual(
   activeOnlyGroups[0].parentGroups[0].finishedChildren.map((thread) => thread.id),
   ["child-c", "child-d"],

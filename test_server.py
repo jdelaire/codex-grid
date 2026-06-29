@@ -369,6 +369,7 @@ class ServerThreadPayloadTests(unittest.TestCase):
                         make_thread("long", NOW_SECONDS - 60, name="Long"),
                         make_thread("missing", NOW_SECONDS - 60, name="Missing"),
                         make_thread("error", NOW_SECONDS - 60, name="Error"),
+                        make_thread("malformed", NOW_SECONDS - 60, name="Malformed"),
                     ],
                     "nextCursor": None,
                 },
@@ -385,6 +386,9 @@ class ServerThreadPayloadTests(unittest.TestCase):
                 ),
                 ("thread/read", "missing", True): make_read_thread("missing"),
                 ("thread/read", "error", True): server.AppServerError("boom"),
+                ("thread/read", "malformed", True): {
+                    "thread": {"id": "malformed", "turns": ["bad-turn"]}
+                },
             }
         )
 
@@ -412,6 +416,11 @@ class ServerThreadPayloadTests(unittest.TestCase):
         )
         self.assertEqual(
             by_id["error"]["last_response_snippet"],
+            server.NO_RESPONSE_CAPTURED,
+        )
+        self.assertEqual(by_id["malformed"]["state"], "ACTIVE")
+        self.assertEqual(
+            by_id["malformed"]["last_response_snippet"],
             server.NO_RESPONSE_CAPTURED,
         )
 
