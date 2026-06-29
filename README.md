@@ -8,7 +8,7 @@ The app is intentionally small:
 
 - Python stdlib server.
 - Static browser frontend.
-- Three.js from CDN.
+- Vendored Three.js runtime.
 - No React, bundler, database, or hosted backend.
 
 ## Features
