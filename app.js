@@ -40,8 +40,13 @@ const dom = {
   detailId: document.querySelector("#detailId"),
   threadMessageForm: document.querySelector("#threadMessageForm"),
   threadMessageInput: document.querySelector("#threadMessageInput"),
+  threadMessagePreview: document.querySelector("#threadMessagePreview"),
   threadMessageSubmit: document.querySelector("#threadMessageSubmit"),
   threadMessageStatus: document.querySelector("#threadMessageStatus"),
+  sendConfirmDialog: document.querySelector("#sendConfirmDialog"),
+  sendConfirmTarget: document.querySelector("#sendConfirmTarget"),
+  sendConfirmMessage: document.querySelector("#sendConfirmMessage"),
+  sendConfirmSubmit: document.querySelector("#sendConfirmSubmit"),
 };
 
 const parentPalette = [
@@ -936,6 +941,7 @@ function updateMessageComposer(thread) {
   const canSend = canSendToThread(thread);
   dom.threadMessageForm.hidden = !canSend;
   dom.threadMessageInput.disabled = !canSend;
+  dom.threadMessagePreview.disabled = !canSend;
   dom.threadMessageSubmit.disabled = !canSend;
   if (!canSend) {
     dom.threadMessageInput.value = "";
@@ -1160,6 +1166,32 @@ function setShowInactive(nextShowInactive) {
 
 async function onThreadMessageSubmit(event) {
   event.preventDefault();
+  showSendConfirmation();
+}
+
+function showSendConfirmation() {
+  const thread = state.selectedThread;
+  const message = dom.threadMessageInput.value.trim();
+  if (!canSendToThread(thread)) {
+    return;
+  }
+  if (!message) {
+    dom.threadMessageStatus.textContent = "Message is empty.";
+    return;
+  }
+  dom.sendConfirmTarget.textContent = `${thread.title || thread.nickname} (${thread.id})`;
+  dom.sendConfirmMessage.textContent = message;
+  dom.sendConfirmDialog.showModal();
+}
+
+async function onSendConfirmClose() {
+  if (dom.sendConfirmDialog.returnValue !== "send") {
+    return;
+  }
+  await sendConfirmedThreadMessage();
+}
+
+async function sendConfirmedThreadMessage() {
   const thread = state.selectedThread;
   if (!canSendToThread(thread)) {
     return;
@@ -1213,6 +1245,8 @@ function bindEvents() {
   dom.labelsToggle.addEventListener("click", () => setLabels(!state.labels));
   dom.inactiveToggle.addEventListener("click", () => setShowInactive(!state.showInactive));
   dom.threadMessageForm.addEventListener("submit", onThreadMessageSubmit);
+  dom.threadMessagePreview.addEventListener("click", showSendConfirmation);
+  dom.sendConfirmDialog.addEventListener("close", onSendConfirmClose);
 }
 
 function startPolling() {

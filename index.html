@@ -93,10 +93,22 @@
               placeholder="Message this thread"
             ></textarea>
             <div class="thread-message-actions">
+              <button id="threadMessagePreview" type="button">Preview</button>
               <button id="threadMessageSubmit" type="submit">Send</button>
               <span id="threadMessageStatus" role="status"></span>
             </div>
           </form>
+          <dialog id="sendConfirmDialog" class="send-dialog">
+            <form method="dialog">
+              <h3>Send to thread?</h3>
+              <p id="sendConfirmTarget"></p>
+              <pre id="sendConfirmMessage"></pre>
+              <menu>
+                <button value="cancel">Cancel</button>
+                <button id="sendConfirmSubmit" value="send">Send</button>
+              </menu>
+            </form>
+          </dialog>
         </div>
       </aside>
     </main>

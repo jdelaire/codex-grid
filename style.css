@@ -421,6 +421,25 @@ dd {
   line-height: 1.3;
 }
 
+.send-dialog {
+  max-width: min(560px, calc(100vw - 32px));
+  border: 1px solid rgba(172, 188, 209, 0.24);
+  border-radius: 8px;
+  background: #0b1120;
+  color: var(--text);
+}
+
+.send-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.58);
+}
+
+.send-dialog pre {
+  max-height: 260px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 980px) {
   html,
   body {
