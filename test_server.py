@@ -375,6 +375,23 @@ class ServerThreadPayloadTests(unittest.TestCase):
             ],
         )
 
+    def test_send_thread_message_dry_run_does_not_call_app_server(self):
+        fake = FakeAppServerClient()
+
+        payload = server.send_thread_message_payload(
+            "main",
+            "Ship it",
+            "thread",
+            client_factory=lambda: fake,
+            now_ms=NOW_MS,
+            dry_run=True,
+        )
+
+        self.assertFalse(payload["sent"])
+        self.assertTrue(payload["dry_run"])
+        self.assertEqual(payload["message"], "Ship it")
+        self.assertEqual(fake.calls, [])
+
     def test_send_thread_message_refuses_child_agent_role(self):
         fake = FakeAppServerClient()
 

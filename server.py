@@ -531,6 +531,7 @@ def send_thread_message_payload(
     role,
     client_factory=None,
     now_ms=None,
+    dry_run=False,
 ):
     if now_ms is None:
         now_ms = int(time.time() * 1000)
@@ -545,6 +546,16 @@ def send_thread_message_payload(
     text = str(message or "").strip()
     if not text:
         return thread_message_error_payload(thread_id, now_ms, "message is empty")
+
+    if dry_run:
+        return {
+            "source": "codex_app_server",
+            "sent": False,
+            "dry_run": True,
+            "thread_id": thread_id,
+            "message": text,
+            "generated_at_ms": now_ms,
+        }
 
     if client_factory is None:
         client_factory = default_client_factory()
@@ -662,6 +673,7 @@ class CodimsRequestHandler(SimpleHTTPRequestHandler):
             request.get("message", ""),
             request.get("role", ""),
             client_factory=self.client_factory,
+            dry_run=bool(request.get("dry_run")),
         )
         self.send_json(payload)
 
