@@ -16,6 +16,8 @@ import {
   projectRoomGridSpacing,
   projectDisplayText,
   roomCameraFocus,
+  shouldPollThreads,
+  threadActivityLabel,
 } from "./visual-model.mjs";
 
 const threads = [
@@ -99,6 +101,12 @@ assert.equal(matchesThreadSearch(threads[1], "ada"), true);
 assert.equal(matchesThreadSearch(threads[1], "codims"), true);
 assert.equal(matchesThreadSearch(threads[1], "missing"), false);
 assert.equal(matchesThreadSearch(threads[1], ""), true);
+assert.equal(threadActivityLabel({ state: "ACTIVE" }), "RUNNING");
+assert.equal(threadActivityLabel({ state: "DONE" }), "DONE");
+assert.equal(threadActivityLabel({ state: "RECENT" }), "IDLE");
+assert.equal(shouldPollThreads(true, false), true);
+assert.equal(shouldPollThreads(true, true), false);
+assert.equal(shouldPollThreads(false, false), false);
 assert.equal(privacyLabel("Build Codims", false), "Build Codims");
 assert.equal(privacyLabel("Build Codims", true), "Hidden");
 assert.equal(privacyPath("/repo/app", false), "/repo/app");

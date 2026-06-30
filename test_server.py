@@ -311,6 +311,41 @@ class ServerThreadPayloadTests(unittest.TestCase):
             ("ACTIVE", "energetic"),
         )
 
+    def test_threads_payload_treats_interrupted_thread_as_resumable(self):
+        fake = FakeAppServerClient(
+            {
+                ("thread/list", None): {
+                    "data": [
+                        make_thread(
+                            "resumed",
+                            NOW_SECONDS - 10,
+                            name="Resumed thread",
+                            nickname="Ada",
+                        )
+                    ],
+                    "nextCursor": None,
+                },
+                ("thread/read", "parent", False): {
+                    "thread": {"id": "parent", "name": "Parent task"}
+                },
+                ("thread/read", "resumed", True): make_read_thread(
+                    "resumed",
+                    status="interrupted",
+                    agent_text="Working again.",
+                ),
+            }
+        )
+
+        payload = server.get_threads_payload(
+            client_factory=lambda: fake,
+            active_minutes=5,
+            max_age_hours=12,
+            now_ms=NOW_MS,
+        )
+
+        self.assertEqual(payload["threads"][0]["state"], "ACTIVE")
+        self.assertEqual(payload["threads"][0]["intensity"], "energetic")
+
     def test_threads_payload_marks_completed_terminal_and_active_lifecycles(self):
         fake = FakeAppServerClient(
             {
@@ -323,9 +358,9 @@ class ServerThreadPayloadTests(unittest.TestCase):
                             nickname="Ada",
                         ),
                         make_thread(
-                            "interrupted",
+                            "failed",
                             NOW_SECONDS - 20,
-                            name="Interrupted child",
+                            name="Failed child",
                             nickname="Grace",
                         ),
                         make_thread(
@@ -345,9 +380,9 @@ class ServerThreadPayloadTests(unittest.TestCase):
                     status={"type": "completed"},
                     agent_text="Finished.",
                 ),
-                ("thread/read", "interrupted", True): make_read_thread(
-                    "interrupted",
-                    status={"type": "interrupted"},
+                ("thread/read", "failed", True): make_read_thread(
+                    "failed",
+                    status={"type": "failed"},
                     agent_text="Stopped.",
                 ),
                 ("thread/read", "active", True): make_read_thread(
@@ -368,8 +403,8 @@ class ServerThreadPayloadTests(unittest.TestCase):
         by_id = {thread["id"]: thread for thread in payload["threads"]}
         self.assertEqual(by_id["done"]["state"], "DONE")
         self.assertEqual(by_id["done"]["intensity"], "idle")
-        self.assertEqual(by_id["interrupted"]["state"], "RECENT")
-        self.assertEqual(by_id["interrupted"]["intensity"], "idle")
+        self.assertEqual(by_id["failed"]["state"], "RECENT")
+        self.assertEqual(by_id["failed"]["intensity"], "idle")
         self.assertEqual(by_id["active"]["state"], "ACTIVE")
         self.assertEqual(by_id["active"]["intensity"], "energetic")
         self.assertEqual(payload["counts"]["active"], 1)

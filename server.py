@@ -34,7 +34,6 @@ TERMINAL_TURN_STATUSES = {
     "failed",
     "cancelled",
     "canceled",
-    "interrupted",
 }
 LAST_RESPONSE_SNIPPET_LIMIT = 280
 NO_RESPONSE_CAPTURED = "No response captured"

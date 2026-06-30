@@ -15,6 +15,8 @@ import {
   projectRoomGridSpacing,
   projectRoomLayout,
   roomCameraFocus,
+  shouldPollThreads,
+  threadActivityLabel,
 } from "./visual-model.mjs";
 
 const dom = {
@@ -23,6 +25,7 @@ const dom = {
   emptyState: document.querySelector("#emptyState"),
   statusText: document.querySelector("#statusText"),
   activeCount: document.querySelector("#activeCount"),
+  activeCounter: document.querySelector("#activeCount").closest(".counter"),
   visibleCount: document.querySelector("#visibleCount"),
   projectCount: document.querySelector("#projectCount"),
   controls: document.querySelector("#controls"),
@@ -103,6 +106,7 @@ const state = {
   detailSeq: 0,
   sendSeq: 0,
   sendPending: false,
+  refreshing: false,
   cameraFocus: null,
   selectable: [],
   refreshSeq: 0,
@@ -493,6 +497,10 @@ function createLabel(className) {
   label.className = className;
   dom.labels.appendChild(label);
   return label;
+}
+
+function visibleActivityLabel(text, isRunning) {
+  return isRunning ? `RUNNING - ${text}` : text;
 }
 
 function agentGlowForState(thread) {
@@ -893,11 +901,14 @@ function reconcileAgents(projectGroups) {
 
       const parentLabel = state.parentLabels.get(parentGroup.key);
       const parentCssColor = cssHexColor(parentColorHex);
-      parentLabel.textContent = privacyLabel(parentGroup.title, state.privacy);
+      parentLabel.textContent = visibleActivityLabel(
+        privacyLabel(parentGroup.title, state.privacy),
+        parentGroup.isActive,
+      );
       parentLabel.classList.toggle("is-active", parentGroup.isActive);
       parentLabel.dataset.parentKey = parentGroup.key;
       parentLabel.style.borderColor = parentCssColor;
-      parentLabel.style.boxShadow = parentGroup.isActive ? `0 0 24px ${parentCssColor}88` : "";
+      parentLabel.style.boxShadow = "";
 
       let digestObject = state.digestObjects.get(parentGroup.key);
       if (!digestObject) {
@@ -942,14 +953,17 @@ function reconcileAgents(projectGroups) {
         state.selectable.push(parts.body, parts.head);
 
         const label = state.agentLabels.get(thread.id);
-        label.textContent = privacyLabel(thread.nickname || "agent", state.privacy);
+        label.textContent = visibleActivityLabel(
+          privacyLabel(thread.nickname || "agent", state.privacy),
+          thread.state === "ACTIVE",
+        );
         label.classList.toggle("is-active", thread.state === "ACTIVE");
         label.classList.toggle("is-done", thread.state === "DONE");
         label.dataset.threadId = thread.id;
         label.dataset.parentId = thread.parent_id || thread.id;
         label.dataset.roomIndex = String(index);
         label.style.borderColor = agentLabelBorderColor(thread, parentCssColor);
-        label.style.boxShadow = thread.state === "ACTIVE" ? `0 0 16px ${parentCssColor}66` : "";
+        label.style.boxShadow = "";
 
         const handoffKey = `${parentGroup.key}:${thread.id}`;
         activeHandoffKeys.add(handoffKey);
@@ -1003,6 +1017,8 @@ function updateCounters(projectGroups) {
     0,
   );
   dom.activeCount.textContent = String(activeThreads);
+  dom.activeCounter.classList.toggle("is-running", activeThreads > 0);
+  dom.activeCounter.setAttribute("aria-label", `${activeThreads} running now`);
   dom.visibleCount.textContent = String(visibleThreads);
   dom.projectCount.textContent = String(projectGroups.length);
   dom.emptyState.textContent = state.showInactive
@@ -1054,6 +1070,7 @@ async function sendThreadMessage(threadId, message, role) {
 
 async function refreshThreads() {
   const seq = ++state.refreshSeq;
+  state.refreshing = true;
   try {
     const payload = await fetchThreads();
     if (seq !== state.refreshSeq) {
@@ -1099,6 +1116,10 @@ async function refreshThreads() {
       return;
     }
     dom.statusText.textContent = `Refresh failed: ${error.message}`;
+  } finally {
+    if (seq === state.refreshSeq) {
+      state.refreshing = false;
+    }
   }
 }
 
@@ -1158,7 +1179,8 @@ function renderDetails(thread) {
   dom.detailsEmpty.hidden = true;
   dom.detailsContent.hidden = false;
   dom.detailNickname.textContent = privacyLabel(thread.nickname || "agent", state.privacy);
-  dom.detailState.textContent = `${thread.state} / ${thread.intensity}`;
+  dom.detailState.textContent = `${threadActivityLabel(thread)} / ${thread.intensity || "idle"}`;
+  dom.detailState.classList.toggle("is-running", thread.state === "ACTIVE");
   dom.detailState.classList.toggle("is-done", thread.state === "DONE");
   dom.detailState.classList.toggle("is-digest", false);
   dom.detailRole.textContent = thread.role || "thread";
@@ -1191,6 +1213,7 @@ function renderDigestDetails(parentGroup) {
   dom.detailsContent.hidden = false;
   dom.detailNickname.textContent = privacyLabel(parentGroup.title || "Finished agents", state.privacy);
   dom.detailState.textContent = "DONE DIGEST";
+  dom.detailState.classList.toggle("is-running", false);
   dom.detailState.classList.toggle("is-done", false);
   dom.detailState.classList.toggle("is-digest", true);
   dom.detailRole.textContent = "digest";
@@ -1505,14 +1528,20 @@ function updatePrivacySensitiveUi() {
   for (const [parentKey, label] of state.parentLabels.entries()) {
     const parentGroup = state.parentAgents.get(parentKey)?.userData.parentGroup;
     if (parentGroup) {
-      label.textContent = privacyLabel(parentGroup.title, state.privacy);
+      label.textContent = visibleActivityLabel(
+        privacyLabel(parentGroup.title, state.privacy),
+        parentGroup.isActive,
+      );
     }
   }
 
   for (const [threadId, label] of state.agentLabels.entries()) {
     const thread = state.agents.get(threadId)?.userData.thread;
     if (thread) {
-      label.textContent = privacyLabel(thread.nickname || "agent", state.privacy);
+      label.textContent = visibleActivityLabel(
+        privacyLabel(thread.nickname || "agent", state.privacy),
+        thread.state === "ACTIVE",
+      );
     }
   }
 
@@ -1676,8 +1705,9 @@ function bindEvents() {
 }
 
 function startPolling() {
+  refreshThreads();
   window.setInterval(() => {
-    if (state.live) {
+    if (shouldPollThreads(state.live, state.refreshing)) {
       refreshThreads();
     }
   }, 2000);

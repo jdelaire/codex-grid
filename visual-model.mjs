@@ -149,6 +149,20 @@ export function privacyPath(value, privacyMode) {
   return String(value || "");
 }
 
+export function threadActivityLabel(thread) {
+  if (thread?.state === "ACTIVE") {
+    return "RUNNING";
+  }
+  if (thread?.state === "DONE") {
+    return "DONE";
+  }
+  return "IDLE";
+}
+
+export function shouldPollThreads(live, refreshing) {
+  return Boolean(live && !refreshing);
+}
+
 export function normalizePreferences(raw = {}) {
   let maxAgeHours = normalizeNumericPreference(raw.maxAgeHours, "8", (value) => value >= 0);
   if (raw.prefsVersion !== 2 && maxAgeHours === "12") {
