@@ -69,10 +69,28 @@
         <section class="review-lane" aria-labelledby="reviewLaneTitle">
           <div class="review-lane-header">
             <div>
-              <h2 id="reviewLaneTitle">Review lane</h2>
+              <h2 id="reviewLaneTitle">Action inbox</h2>
               <p id="reviewCount">0 unreviewed / 0 done</p>
             </div>
             <button id="reviewUnreviewedToggle" type="button" aria-pressed="false">Unreviewed only</button>
+          </div>
+          <div class="action-inbox-filters" aria-label="Action inbox filters">
+            <button type="button" data-action-inbox-filter="needs_review" aria-pressed="false">
+              <span data-action-inbox-count="needs_review">0</span>
+              <span>Needs review</span>
+            </button>
+            <button type="button" data-action-inbox-filter="running" aria-pressed="false">
+              <span data-action-inbox-count="running">0</span>
+              <span>Running</span>
+            </button>
+            <button type="button" data-action-inbox-filter="stale" aria-pressed="false">
+              <span data-action-inbox-count="stale">0</span>
+              <span>Stale</span>
+            </button>
+            <button type="button" data-action-inbox-filter="reviewed" aria-pressed="false">
+              <span data-action-inbox-count="reviewed">0</span>
+              <span>Reviewed</span>
+            </button>
           </div>
           <div id="reviewList" class="review-list"></div>
         </section>
@@ -93,7 +111,7 @@
             <dd id="detailAge"></dd>
             <dt>Title / content</dt>
             <dd id="detailTitle" class="wrapped"></dd>
-            <dt>Agent prompt + last response</dt>
+            <dt id="detailThreadContentLabel">Agent prompt + last response</dt>
             <dd id="detailThreadContent" class="wrapped thread-content"></dd>
             <dt>Parent thread</dt>
             <dd id="detailParent" class="wrapped"></dd>

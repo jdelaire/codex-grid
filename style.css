@@ -408,6 +408,7 @@ h1::before {
 }
 
 #reviewUnreviewedToggle,
+.action-inbox-filters button,
 .review-toggle,
 .review-item-main {
   border: 1px solid rgba(172, 188, 209, 0.2);
@@ -426,6 +427,45 @@ h1::before {
 }
 
 #reviewUnreviewedToggle[aria-pressed="true"] {
+  color: #cffafe;
+  border-color: rgba(34, 211, 238, 0.62);
+  background: rgba(34, 211, 238, 0.12);
+}
+
+.action-inbox-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.action-inbox-filters button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  padding: 6px 7px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.15;
+  text-align: left;
+}
+
+.action-inbox-filters button span:first-child {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 760;
+  line-height: 1;
+}
+
+.action-inbox-filters button span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.action-inbox-filters button[aria-pressed="true"] {
   color: #cffafe;
   border-color: rgba(34, 211, 238, 0.62);
   background: rgba(34, 211, 238, 0.12);
@@ -458,12 +498,14 @@ h1::before {
 }
 
 .review-item-main:hover,
+.action-inbox-filters button:hover,
 .review-toggle:hover,
 #reviewUnreviewedToggle:hover {
   border-color: rgba(34, 211, 238, 0.48);
 }
 
 .review-item-main:focus-visible,
+.action-inbox-filters button:focus-visible,
 .review-toggle:focus-visible,
 #reviewUnreviewedToggle:focus-visible {
   outline: 2px solid rgba(34, 211, 238, 0.45);
@@ -503,6 +545,32 @@ h1::before {
   color: #d1fae5;
   border-color: rgba(52, 211, 153, 0.58);
   background: rgba(52, 211, 153, 0.12);
+}
+
+.review-status-pill {
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  width: 76px;
+  border: 1px solid rgba(172, 188, 209, 0.18);
+  border-radius: 6px;
+  background: rgba(148, 163, 184, 0.08);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.review-item.is-running .review-status-pill {
+  color: #d1fae5;
+  border-color: rgba(52, 211, 153, 0.5);
+  background: rgba(52, 211, 153, 0.1);
+}
+
+.review-item.is-stale .review-status-pill {
+  color: #fef3c7;
+  border-color: rgba(245, 158, 11, 0.46);
+  background: rgba(245, 158, 11, 0.1);
 }
 
 .details-heading {
@@ -589,7 +657,18 @@ dd {
   gap: 8px;
 }
 
+.timeline-list {
+  display: grid;
+  gap: 8px;
+}
+
 .digest-empty {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.timeline-empty {
   color: var(--muted);
   font-size: 13px;
   line-height: 1.4;
@@ -610,7 +689,35 @@ dd {
   transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
 }
 
+.timeline-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
+  align-items: stretch;
+}
+
+.timeline-item-main {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  border: 1px solid rgba(172, 188, 209, 0.18);
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.62);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  padding: 9px 10px;
+  text-align: left;
+  transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
 .digest-card:hover {
+  border-color: rgba(34, 211, 238, 0.48);
+  background: rgba(20, 31, 49, 0.82);
+  transform: translateY(-1px);
+}
+
+.timeline-item-main:hover {
   border-color: rgba(34, 211, 238, 0.48);
   background: rgba(20, 31, 49, 0.82);
   transform: translateY(-1px);
@@ -621,7 +728,20 @@ dd {
   outline-offset: 2px;
 }
 
+.timeline-item-main:focus-visible {
+  outline: 2px solid rgba(34, 211, 238, 0.45);
+  outline-offset: 2px;
+}
+
 .digest-card-meta {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.25;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.timeline-item-meta {
   color: var(--muted);
   font-size: 11px;
   line-height: 1.25;
@@ -636,11 +756,52 @@ dd {
   line-height: 1.25;
 }
 
+.timeline-item-title {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
 .digest-card-response {
   color: #cbd5e1;
   font-size: 12px;
   line-height: 1.35;
   overflow-wrap: anywhere;
+}
+
+.timeline-item-snippet {
+  color: #cbd5e1;
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.timeline-status {
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  width: 92px;
+  border: 1px solid rgba(172, 188, 209, 0.18);
+  border-radius: 6px;
+  background: rgba(148, 163, 184, 0.08);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.timeline-item.is-active .timeline-status,
+.timeline-item.is-finished .timeline-status {
+  color: #fef3c7;
+  border-color: rgba(245, 158, 11, 0.46);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.timeline-item.is-active .timeline-status {
+  color: #d1fae5;
+  border-color: rgba(52, 211, 153, 0.5);
+  background: rgba(52, 211, 153, 0.1);
 }
 
 .thread-message {

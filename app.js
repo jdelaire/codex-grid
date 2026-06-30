@@ -1,11 +1,11 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import {
+  buildActionInbox,
+  buildParentTimeline,
   buildProjectParentGroups,
-  buildReviewItems,
   childVisualLayout,
   densityScale,
-  filterReviewItems,
   filterVisibleProjectGroups,
   handoffShouldAnimate,
   matchesThreadSearch,
@@ -42,6 +42,13 @@ const dom = {
   inactiveToggle: document.querySelector("#inactiveToggle"),
   reviewCount: document.querySelector("#reviewCount"),
   reviewUnreviewedToggle: document.querySelector("#reviewUnreviewedToggle"),
+  actionInboxButtons: [...document.querySelectorAll("[data-action-inbox-filter]")],
+  actionInboxCounts: new Map(
+    [...document.querySelectorAll("[data-action-inbox-count]")].map((element) => [
+      element.dataset.actionInboxCount,
+      element,
+    ]),
+  ),
   reviewList: document.querySelector("#reviewList"),
   detailsEmpty: document.querySelector("#detailsEmpty"),
   detailsContent: document.querySelector("#detailsContent"),
@@ -51,6 +58,7 @@ const dom = {
   detailProject: document.querySelector("#detailProject"),
   detailAge: document.querySelector("#detailAge"),
   detailTitle: document.querySelector("#detailTitle"),
+  detailThreadContentLabel: document.querySelector("#detailThreadContentLabel"),
   detailThreadContent: document.querySelector("#detailThreadContent"),
   detailParent: document.querySelector("#detailParent"),
   detailCwd: document.querySelector("#detailCwd"),
@@ -114,10 +122,14 @@ const state = {
   density: "normal",
   search: "",
   unreviewedOnly: false,
+  actionInboxFilter: null,
+  actionInbox: buildActionInbox([]),
   reviewedThreadIds: loadReviewedThreadIds(),
   reviewItems: [],
+  projectGroups: [],
   selectedMode: null,
   selectedDigest: null,
+  selectedParentKey: null,
   selectedId: null,
   selectedThread: null,
   threads: [],
@@ -920,9 +932,11 @@ function reconcileAgents(projectGroups) {
       parentParts.glowMaterial.opacity = parentGroup.isActive ? 0.72 : 0.24;
       parentParts.body.userData.threadId = parentGroup.lead.id;
       parentParts.body.userData.thread = parentGroup.lead;
+      parentParts.body.userData.parentGroup = parentGroup;
       parentParts.body.userData.room = room;
       parentParts.head.userData.threadId = parentGroup.lead.id;
       parentParts.head.userData.thread = parentGroup.lead;
+      parentParts.head.userData.parentGroup = parentGroup;
       parentParts.head.userData.room = room;
       state.selectable.push(parentParts.body, parentParts.head);
 
@@ -1054,66 +1068,139 @@ function updateCounters(projectGroups) {
   dom.emptyState.hidden = visibleThreads !== 0;
 }
 
-function currentReviewItems() {
-  state.reviewItems = state.reviewItems.map((item) => ({
-    ...item,
-    reviewed: state.reviewedThreadIds.has(item.id),
-  }));
-  return state.reviewItems;
+function currentStaleBeforeMs() {
+  const maxAgeHours = Number(dom.maxAgeHours.value || "0");
+  if (!Number.isFinite(maxAgeHours) || maxAgeHours <= 0) {
+    return undefined;
+  }
+  return Date.now() - maxAgeHours * 60 * 60 * 1000;
+}
+
+function refreshActionInbox() {
+  state.actionInbox = buildActionInbox(state.projectGroups, state.reviewedThreadIds, {
+    staleBeforeMs: currentStaleBeforeMs(),
+  });
+  state.reviewItems = state.actionInbox.reviewItems;
+}
+
+function visibleActionInboxItems(inbox) {
+  if (state.unreviewedOnly) {
+    return inbox.items.filter((item) => item.type === "needs_review");
+  }
+  if (state.actionInboxFilter) {
+    return inbox.items.filter((item) => item.type === state.actionInboxFilter);
+  }
+  return inbox.items;
+}
+
+function actionInboxTypeLabel(type) {
+  if (type === "needs_review") {
+    return "Needs review";
+  }
+  if (type === "running") {
+    return "Running";
+  }
+  if (type === "stale") {
+    return "Stale";
+  }
+  return "Reviewed";
+}
+
+function actionInboxItemAgeSeconds(item) {
+  const ageSeconds = Number(item.age_seconds);
+  if (Number.isFinite(ageSeconds)) {
+    return ageSeconds;
+  }
+  if (item.latestUpdated) {
+    return Math.max(0, Math.floor((Date.now() - item.latestUpdated) / 1000));
+  }
+  return 0;
+}
+
+function actionInboxEmptyText() {
+  if (state.unreviewedOnly) {
+    return "No items need review.";
+  }
+  if (state.actionInboxFilter) {
+    return `No ${actionInboxTypeLabel(state.actionInboxFilter).toLowerCase()} items.`;
+  }
+  return "No inbox items.";
 }
 
 function renderReviewLane() {
-  const items = currentReviewItems();
-  const total = items.length;
-  const reviewed = items.filter((item) => item.reviewed).length;
-  const unreviewed = total - reviewed;
-  const visibleItems = filterReviewItems(items, state.unreviewedOnly);
+  const inbox = state.actionInbox || buildActionInbox([]);
+  const counts = inbox.counts || {};
+  const visibleItems = visibleActionInboxItems(inbox);
 
-  dom.reviewCount.textContent = `${unreviewed} unreviewed / ${total} done`;
+  dom.reviewCount.textContent = `${counts.needs_review || 0} needs review / ${
+    counts.running || 0
+  } running / ${counts.stale || 0} stale / ${counts.reviewed || 0} reviewed`;
   dom.reviewUnreviewedToggle.setAttribute("aria-pressed", String(state.unreviewedOnly));
+  for (const button of dom.actionInboxButtons) {
+    const type = button.dataset.actionInboxFilter;
+    button.setAttribute(
+      "aria-pressed",
+      String(!state.unreviewedOnly && state.actionInboxFilter === type),
+    );
+    const count = dom.actionInboxCounts.get(type);
+    if (count) {
+      count.textContent = String(counts[type] || 0);
+    }
+  }
   dom.reviewList.replaceChildren();
 
   if (!visibleItems.length) {
     const empty = document.createElement("p");
     empty.className = "review-empty";
-    empty.textContent = state.unreviewedOnly ? "No unreviewed done items." : "No done items.";
+    empty.textContent = actionInboxEmptyText();
     dom.reviewList.appendChild(empty);
     return;
   }
 
   for (const item of visibleItems) {
+    const isReviewItem = item.type === "needs_review" || item.type === "reviewed";
     const row = document.createElement("div");
-    row.className = "review-item";
+    row.className = `review-item is-${item.type}`;
 
     const openButton = document.createElement("button");
     openButton.type = "button";
     openButton.className = "review-item-main";
-    openButton.addEventListener("click", () => showDetails(digestDetailThread(item)));
+    openButton.addEventListener("click", () => openActionInboxItem(item));
 
     const meta = document.createElement("span");
     meta.className = "review-item-meta";
     meta.textContent = state.privacy
       ? "Hidden"
-      : `${item.nickname || "agent"} / ${formatAge(item.age_seconds || 0)}`;
+      : `${actionInboxTypeLabel(item.type)} / ${item.nickname || item.project || "thread"} / ${formatAge(
+          actionInboxItemAgeSeconds(item),
+        )}`;
 
     const title = document.createElement("span");
     title.className = "review-item-title";
-    title.textContent = privacyLabel(item.title || "(untitled)", state.privacy);
+    title.textContent = privacyLabel(item.title || item.parentTitle || "(untitled)", state.privacy);
 
     const snippet = document.createElement("span");
     snippet.className = "review-item-snippet";
-    snippet.textContent = state.privacy ? "Hidden" : item.last_response_snippet || "No response captured";
+    snippet.textContent = state.privacy
+      ? "Hidden"
+      : item.last_response_snippet || (item.latestUpdated ? new Date(item.latestUpdated).toLocaleString() : "");
 
     openButton.replaceChildren(meta, title, snippet);
 
-    const toggle = document.createElement("button");
-    toggle.type = "button";
-    toggle.className = "review-toggle";
-    toggle.textContent = item.reviewed ? "Reviewed" : "Review";
-    toggle.setAttribute("aria-pressed", String(item.reviewed));
-    toggle.addEventListener("click", () => toggleReviewedThread(item.id));
-
-    row.replaceChildren(openButton, toggle);
+    if (isReviewItem) {
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "review-toggle";
+      toggle.textContent = item.reviewed ? "Reviewed" : "Review";
+      toggle.setAttribute("aria-pressed", String(item.reviewed));
+      toggle.addEventListener("click", () => toggleReviewedThread(item.id));
+      row.replaceChildren(openButton, toggle);
+    } else {
+      const status = document.createElement("span");
+      status.className = "review-status-pill";
+      status.textContent = actionInboxTypeLabel(item.type);
+      row.replaceChildren(openButton, status);
+    }
     dom.reviewList.appendChild(row);
   }
 }
@@ -1125,7 +1212,9 @@ function toggleReviewedThread(threadId) {
     state.reviewedThreadIds.add(threadId);
   }
   saveReviewedThreadIds();
+  refreshActionInbox();
   renderReviewLane();
+  renderSelectedParentTimeline();
 }
 
 function updateStatus(payload) {
@@ -1169,6 +1258,39 @@ async function sendThreadMessage(threadId, message, role) {
   return response.json();
 }
 
+function visibleParentGroups() {
+  return state.projectGroups.flatMap((projectGroup) => projectGroup.parentGroups || []);
+}
+
+function findParentGroupByKey(parentKey) {
+  return visibleParentGroups().find((parentGroup) => parentGroup.key === parentKey) || null;
+}
+
+function showParentDetails(parentGroup) {
+  showDetails(parentGroup.lead, parentGroup);
+}
+
+function openActionInboxItem(item) {
+  if (item.type === "running" || item.type === "stale") {
+    const parentGroup = findParentGroupByKey(item.parentKey);
+    if (parentGroup) {
+      showParentDetails(parentGroup);
+    }
+    return;
+  }
+  showDetails(digestDetailThread(item));
+}
+
+function renderSelectedParentTimeline() {
+  if (!state.selectedParentKey || !state.selectedThread) {
+    return;
+  }
+  const parentGroup = findParentGroupByKey(state.selectedParentKey);
+  if (parentGroup) {
+    renderDetails(parentGroup.lead, parentGroup);
+  }
+}
+
 async function refreshThreads() {
   const seq = ++state.refreshSeq;
   state.refreshing = true;
@@ -1181,7 +1303,8 @@ async function refreshThreads() {
     state.threads = visibleThreads;
     const allProjectGroups = buildProjectParentGroups(visibleThreads);
     const projectGroups = filterVisibleProjectGroups(allProjectGroups, state.showInactive);
-    state.reviewItems = buildReviewItems(projectGroups, state.reviewedThreadIds);
+    state.projectGroups = projectGroups;
+    refreshActionInbox();
     reconcileRooms(projectGroups);
     reconcileAgents(projectGroups);
     updateCounters(projectGroups);
@@ -1193,6 +1316,13 @@ async function refreshThreads() {
         .find((parentGroup) => parentGroup.key === state.selectedDigest.key);
       if (selectedDigest) {
         renderDigestDetails(selectedDigest);
+      } else {
+        clearDetails();
+      }
+    } else if (state.selectedParentKey) {
+      const selectedParent = findParentGroupByKey(state.selectedParentKey);
+      if (selectedParent) {
+        renderDetails(selectedParent.lead, selectedParent);
       } else {
         clearDetails();
       }
@@ -1226,23 +1356,29 @@ async function refreshThreads() {
   }
 }
 
-function showDetails(thread) {
+function showDetails(thread, parentGroup = null) {
   const changedSelection = state.selectedId !== thread.id;
   state.selectedMode = "thread";
   state.selectedDigest = null;
+  state.selectedParentKey = parentGroup?.key || null;
   state.selectedId = thread.id;
   state.selectedThread = thread;
   if (changedSelection) {
     dom.threadMessageInput.value = "";
     dom.threadMessageStatus.textContent = "";
   }
-  renderDetails(thread);
+  renderDetails(thread, parentGroup);
+  if (parentGroup) {
+    state.detailSeq += 1;
+    return;
+  }
   loadThreadDetail(thread);
 }
 
 function showDigest(parentGroup) {
   state.selectedMode = "digest";
   state.selectedDigest = parentGroup;
+  state.selectedParentKey = null;
   state.selectedId = null;
   state.selectedThread = null;
   state.detailSeq += 1;
@@ -1274,7 +1410,11 @@ function updateMessageComposer(thread) {
   }
 }
 
-function renderDetails(thread) {
+function renderDetails(thread, parentGroup = null) {
+  const timelineParentGroup = parentGroup || findParentGroupByKey(state.selectedParentKey);
+  const shouldRenderTimeline = Boolean(
+    timelineParentGroup && timelineParentGroup.lead?.id === thread.id,
+  );
   state.selectedMode = "thread";
   state.selectedDigest = null;
   state.selectedThread = thread;
@@ -1290,9 +1430,15 @@ function renderDetails(thread) {
   dom.detailProject.textContent = privacyLabel(thread.project || "unknown", state.privacy);
   dom.detailAge.textContent = formatAge(thread.age_seconds);
   dom.detailTitle.textContent = privacyLabel(thread.title || "(untitled)", state.privacy);
-  const cached = state.detailCache.get(thread.id);
-  const detailContent = cached ? cached.content || "(no loaded thread content)" : "Loading thread content...";
-  dom.detailThreadContent.textContent = state.privacy ? "Hidden" : detailContent;
+  if (shouldRenderTimeline) {
+    dom.detailThreadContentLabel.textContent = "Parent timeline";
+    renderParentTimeline(timelineParentGroup);
+  } else {
+    dom.detailThreadContentLabel.textContent = "Agent prompt + last response";
+    const cached = state.detailCache.get(thread.id);
+    const detailContent = cached ? cached.content || "(no loaded thread content)" : "Loading thread content...";
+    dom.detailThreadContent.textContent = state.privacy ? "Hidden" : detailContent;
+  }
   dom.detailParent.textContent = privacyLabel(thread.parent_title || "(none)", state.privacy);
   dom.detailCwd.textContent = privacyPath(thread.cwd || "(unknown)", state.privacy);
   dom.detailId.textContent = privacyLabel(thread.id, state.privacy);
@@ -1307,6 +1453,63 @@ function digestDetailThread(item) {
     intensity: "digest",
     cwd: "",
   };
+}
+
+function renderParentTimeline(parentGroup) {
+  const items = buildParentTimeline(parentGroup, state.reviewedThreadIds);
+  const list = document.createElement("div");
+  list.className = "timeline-list";
+
+  if (!items.length) {
+    const empty = document.createElement("p");
+    empty.className = "timeline-empty";
+    empty.textContent = "No active or finished items.";
+    list.appendChild(empty);
+  }
+
+  for (const item of items) {
+    const row = document.createElement("div");
+    row.className = `timeline-item is-${item.type}`;
+
+    const openButton = document.createElement("button");
+    openButton.type = "button";
+    openButton.className = "timeline-item-main";
+    openButton.addEventListener("click", () => {
+      if (item.type === "finished") {
+        showDetails(digestDetailThread(item));
+      } else {
+        showDetails(item);
+      }
+    });
+
+    const meta = document.createElement("span");
+    meta.className = "timeline-item-meta";
+    meta.textContent = state.privacy
+      ? "Hidden"
+      : `${item.type === "active" ? "Running" : "Finished"} / ${
+          item.nickname || item.project || "thread"
+        } / ${formatAge(actionInboxItemAgeSeconds(item))}`;
+
+    const title = document.createElement("span");
+    title.className = "timeline-item-title";
+    title.textContent = privacyLabel(item.title || "(untitled)", state.privacy);
+
+    const snippet = document.createElement("span");
+    snippet.className = "timeline-item-snippet";
+    snippet.textContent = state.privacy ? "Hidden" : item.last_response_snippet || "";
+
+    openButton.replaceChildren(meta, title, snippet);
+
+    const status = document.createElement("span");
+    status.className = "timeline-status";
+    status.textContent =
+      item.type === "active" ? "Running" : item.reviewed ? "Reviewed" : "Needs review";
+
+    row.replaceChildren(openButton, status);
+    list.appendChild(row);
+  }
+
+  dom.detailThreadContent.replaceChildren(list);
 }
 
 function renderDigestDetails(parentGroup) {
@@ -1332,6 +1535,7 @@ function renderDigestDetails(parentGroup) {
     ? new Date(parentGroup.latestFinishedAt).toLocaleString()
     : "(none)";
   dom.detailId.textContent = privacyLabel(parentGroup.key, state.privacy);
+  dom.detailThreadContentLabel.textContent = "Finished digest";
 
   const items = (parentGroup.digestItems || []).slice().sort((left, right) => {
     return (right.updated_at_ms || 0) - (left.updated_at_ms || 0);
@@ -1408,6 +1612,7 @@ async function loadThreadDetail(thread) {
 function clearDetails() {
   state.selectedMode = null;
   state.selectedDigest = null;
+  state.selectedParentKey = null;
   state.selectedId = null;
   state.selectedThread = null;
   updateAgentLabelVisibility();
@@ -1467,6 +1672,11 @@ function pickSceneAt(event) {
   const parentGroupDigest = picked.userData.parentGroupDigest;
   if (parentGroupDigest) {
     showDigest(parentGroupDigest);
+    return;
+  }
+  const parentGroup = picked.userData.parentGroup;
+  if (parentGroup) {
+    showParentDetails(parentGroup);
     return;
   }
   const threadId = picked.userData.threadId;
@@ -1810,8 +2020,19 @@ function bindEvents() {
   dom.inactiveToggle.addEventListener("click", () => setShowInactive(!state.showInactive));
   dom.reviewUnreviewedToggle.addEventListener("click", () => {
     state.unreviewedOnly = !state.unreviewedOnly;
+    if (state.unreviewedOnly) {
+      state.actionInboxFilter = null;
+    }
     renderReviewLane();
   });
+  for (const button of dom.actionInboxButtons) {
+    button.addEventListener("click", () => {
+      const filter = button.dataset.actionInboxFilter;
+      state.unreviewedOnly = false;
+      state.actionInboxFilter = state.actionInboxFilter === filter ? null : filter;
+      renderReviewLane();
+    });
+  }
   dom.threadMessageForm.addEventListener("submit", onThreadMessageSubmit);
   dom.threadMessagePreview.addEventListener("click", showSendConfirmation);
   dom.sendConfirmDialog.addEventListener("close", onSendConfirmClose);

@@ -126,11 +126,21 @@ export function buildActionInbox(projectGroups, reviewedThreadIds = new Set(), o
     ...item,
     type: item.reviewed ? "reviewed" : "needs_review",
   }));
+  const items = orderActionInboxItems([...reviewActionItems, ...runningItems, ...staleItems]);
+  const groups = ACTION_INBOX_TYPES.map((type) => {
+    const groupItems = items.filter((item) => item.type === type);
+    return {
+      type,
+      count: groupItems.length,
+      items: groupItems,
+    };
+  });
 
   return {
     reviewItems,
     parentStates,
-    items: [...reviewActionItems, ...runningItems, ...staleItems],
+    items,
+    groups,
     counts: {
       needs_review: reviewActionItems.filter((item) => item.type === "needs_review").length,
       running: runningItems.length,
@@ -138,6 +148,37 @@ export function buildActionInbox(projectGroups, reviewedThreadIds = new Set(), o
       reviewed: reviewActionItems.filter((item) => item.type === "reviewed").length,
     },
   };
+}
+
+export function buildParentTimeline(parentGroup, reviewedThreadIds = new Set()) {
+  const activeItems = (parentGroup?.children || [])
+    .filter((thread) => thread.state === "ACTIVE")
+    .map((thread) => ({
+      ...thread,
+      type: "active",
+      parentId: parentGroup.parentId,
+      parentKey: parentGroup.key,
+      parentTitle: parentGroup.title,
+      reviewed: false,
+    }));
+  const finishedItems = (parentGroup?.digestItems || []).map((item) => ({
+    ...item,
+    type: "finished",
+    state: "DONE",
+    intensity: "digest",
+    parentId: parentGroup.parentId,
+    parentKey: parentGroup.key,
+    parentTitle: parentGroup.title,
+    reviewed: reviewedThreadIds.has(item.id),
+  }));
+
+  return [...activeItems, ...finishedItems]
+    .map((item, index) => ({ item, index }))
+    .sort((left, right) => {
+      const updatedDelta = (right.item.updated_at_ms || 0) - (left.item.updated_at_ms || 0);
+      return updatedDelta || left.index - right.index;
+    })
+    .map(({ item }) => item);
 }
 
 export function childHandoffOffset(index, total) {
@@ -376,6 +417,21 @@ function parentGroupInboxItem(parentGroup, type) {
     latestUpdated: parentGroup.latestUpdated,
     isActive: parentGroup.isActive,
   };
+}
+
+const ACTION_INBOX_TYPES = ["needs_review", "running", "stale", "reviewed"];
+const ACTION_INBOX_PRIORITY = new Map(ACTION_INBOX_TYPES.map((type, index) => [type, index]));
+
+function orderActionInboxItems(items) {
+  return items
+    .map((item, index) => ({ item, index }))
+    .sort((left, right) => {
+      const typeDelta =
+        (ACTION_INBOX_PRIORITY.get(left.item.type) ?? ACTION_INBOX_TYPES.length) -
+        (ACTION_INBOX_PRIORITY.get(right.item.type) ?? ACTION_INBOX_TYPES.length);
+      return typeDelta || left.index - right.index;
+    })
+    .map(({ item }) => item);
 }
 
 function ringCapacity(ring) {

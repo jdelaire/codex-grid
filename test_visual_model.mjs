@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 import {
   buildActionInbox,
+  buildParentTimeline,
   buildProjectParentGroups,
   buildReviewItems,
   childHandoffOffset,
@@ -277,6 +278,19 @@ assert.deepEqual(reviewStateForParentGroup(soloGroup, reviewedThreadIds), {
   unreviewed: 0,
   needsReview: false,
 });
+assert.deepEqual(
+  buildParentTimeline(parentGroup, reviewedThreadIds).map((item) => ({
+    id: item.id,
+    type: item.type,
+    reviewed: item.reviewed,
+  })),
+  [
+    { id: "child-c", type: "finished", reviewed: true },
+    { id: "child-d", type: "finished", reviewed: false },
+    { id: "child-a", type: "active", reviewed: false },
+    { id: "parent", type: "finished", reviewed: false },
+  ],
+);
 
 const actionInbox = buildActionInbox(projectGroups, reviewedThreadIds, { staleBeforeMs: 8000 });
 assert.deepEqual(actionInbox.counts, {
@@ -300,6 +314,30 @@ assert.deepEqual(
 assert.deepEqual(
   actionInbox.items.filter((item) => item.type === "stale").map((item) => item.parentId),
   ["solo"],
+);
+assert.deepEqual(
+  actionInbox.items.map((item) => `${item.type}:${item.id || item.parentId}`),
+  [
+    "needs_review:child-d",
+    "needs_review:parent",
+    "running:parent",
+    "stale:solo",
+    "reviewed:child-c",
+    "reviewed:solo",
+  ],
+);
+assert.deepEqual(
+  actionInbox.groups.map((group) => ({
+    type: group.type,
+    count: group.count,
+    items: group.items.map((item) => item.id || item.parentId),
+  })),
+  [
+    { type: "needs_review", count: 2, items: ["child-d", "parent"] },
+    { type: "running", count: 1, items: ["parent"] },
+    { type: "stale", count: 1, items: ["solo"] },
+    { type: "reviewed", count: 2, items: ["child-c", "solo"] },
+  ],
 );
 assert.deepEqual(
   buildActionInbox(projectGroups, reviewedThreadIds, { staleBeforeMs: 500 }).items.filter(
