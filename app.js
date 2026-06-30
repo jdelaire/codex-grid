@@ -7,6 +7,8 @@ import {
   handoffShouldAnimate,
   matchesThreadSearch,
   parentGroupOffset,
+  privacyLabel,
+  privacyPath,
   projectDisplayText,
   projectRoomGridSpacing,
   projectRoomLayout,
@@ -27,6 +29,7 @@ const dom = {
   threadSearch: document.querySelector("#threadSearch"),
   liveToggle: document.querySelector("#liveToggle"),
   labelsToggle: document.querySelector("#labelsToggle"),
+  privacyToggle: document.querySelector("#privacyToggle"),
   inactiveToggle: document.querySelector("#inactiveToggle"),
   detailsEmpty: document.querySelector("#detailsEmpty"),
   detailsContent: document.querySelector("#detailsContent"),
@@ -67,6 +70,7 @@ const parentPalette = [
 const state = {
   live: true,
   labels: true,
+  privacy: false,
   showInactive: false,
   search: "",
   selectedId: null,
@@ -748,7 +752,7 @@ function reconcileAgents(projectGroups) {
 
       const parentLabel = state.parentLabels.get(parentGroup.key);
       const parentCssColor = cssHexColor(parentColorHex);
-      parentLabel.textContent = parentGroup.title;
+      parentLabel.textContent = privacyLabel(parentGroup.title, state.privacy);
       parentLabel.classList.toggle("is-active", parentGroup.isActive);
       parentLabel.dataset.parentKey = parentGroup.key;
       parentLabel.style.borderColor = parentCssColor;
@@ -782,7 +786,7 @@ function reconcileAgents(projectGroups) {
         state.selectable.push(parts.body, parts.head);
 
         const label = state.agentLabels.get(thread.id);
-        label.textContent = thread.nickname || "agent";
+        label.textContent = privacyLabel(thread.nickname || "agent", state.privacy);
         label.classList.toggle("is-active", thread.state === "ACTIVE");
         label.dataset.threadId = thread.id;
         label.dataset.parentId = thread.parent_id || thread.id;
@@ -971,18 +975,18 @@ function renderDetails(thread) {
   updateAgentLabelVisibility();
   dom.detailsEmpty.hidden = true;
   dom.detailsContent.hidden = false;
-  dom.detailNickname.textContent = thread.nickname || "agent";
+  dom.detailNickname.textContent = privacyLabel(thread.nickname || "agent", state.privacy);
   dom.detailState.textContent = `${thread.state} / ${thread.intensity}`;
   dom.detailRole.textContent = thread.role || "thread";
   dom.detailProject.textContent = thread.project || "unknown";
   dom.detailAge.textContent = formatAge(thread.age_seconds);
-  dom.detailTitle.textContent = thread.title || "(untitled)";
+  dom.detailTitle.textContent = privacyLabel(thread.title || "(untitled)", state.privacy);
   const cached = state.detailCache.get(thread.id);
-  dom.detailThreadContent.textContent =
-    cached ? cached.content || "(no loaded thread content)" : "Loading thread content...";
+  const detailContent = cached ? cached.content || "(no loaded thread content)" : "Loading thread content...";
+  dom.detailThreadContent.textContent = state.privacy ? "Hidden" : detailContent;
   dom.detailParent.textContent = thread.parent_title || "(none)";
-  dom.detailCwd.textContent = thread.cwd || "(unknown)";
-  dom.detailId.textContent = thread.id;
+  dom.detailCwd.textContent = privacyPath(thread.cwd || "(unknown)", state.privacy);
+  dom.detailId.textContent = privacyLabel(thread.id, state.privacy);
   updateMessageComposer(thread);
 }
 
@@ -1008,7 +1012,9 @@ async function loadThreadDetail(thread) {
     if (seq !== state.detailSeq || state.selectedId !== thread.id) {
       return;
     }
-    dom.detailThreadContent.textContent = `Unable to load thread content: ${error.message}`;
+    dom.detailThreadContent.textContent = state.privacy
+      ? "Hidden"
+      : `Unable to load thread content: ${error.message}`;
   }
 }
 
@@ -1174,6 +1180,13 @@ function setLabels(nextLabels) {
   dom.labels.classList.toggle("is-hidden", !nextLabels);
 }
 
+function setPrivacy(nextPrivacy) {
+  state.privacy = nextPrivacy;
+  dom.privacyToggle.setAttribute("aria-pressed", String(nextPrivacy));
+  dom.privacyToggle.textContent = nextPrivacy ? "Privacy on" : "Privacy";
+  refreshThreads();
+}
+
 function setShowInactive(nextShowInactive) {
   state.showInactive = nextShowInactive;
   dom.inactiveToggle.textContent = nextShowInactive ? "Hide idle" : "Show idle";
@@ -1275,6 +1288,7 @@ function bindEvents() {
   });
   dom.liveToggle.addEventListener("click", () => setLive(!state.live));
   dom.labelsToggle.addEventListener("click", () => setLabels(!state.labels));
+  dom.privacyToggle.addEventListener("click", () => setPrivacy(!state.privacy));
   dom.inactiveToggle.addEventListener("click", () => setShowInactive(!state.showInactive));
   dom.threadMessageForm.addEventListener("submit", onThreadMessageSubmit);
   dom.threadMessagePreview.addEventListener("click", showSendConfirmation);
