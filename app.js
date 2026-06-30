@@ -22,6 +22,7 @@ import {
   roomCameraFocus,
   serializeReviewedThreadIds,
   shouldPollThreads,
+  shouldUseDenseLabels,
   staleInboxCutoffMs,
   threadActivityLabel,
 } from "./visual-model.mjs";
@@ -1037,7 +1038,7 @@ function reconcileAgents(projectGroups) {
 }
 
 function updateAgentLabelVisibility() {
-  const dense = state.threads.length > 48;
+  const dense = shouldUseDenseLabels(state.projectGroups);
   for (const [threadId, label] of state.agentLabels.entries()) {
     const agent = state.agents.get(threadId);
     const thread = agent?.userData.thread;

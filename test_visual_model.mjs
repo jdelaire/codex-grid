@@ -26,6 +26,7 @@ import {
   reviewStateForParentGroup,
   roomCameraFocus,
   shouldPollThreads,
+  shouldUseDenseLabels,
   STALE_AFTER_MS,
   STALE_INBOX_FETCH_HOURS,
   staleInboxCutoffMs,
@@ -425,6 +426,35 @@ assert.deepEqual(
     .items.filter((item) => item.type === "stale")
     .map((item) => item.parentId),
   ["inbox-stale"],
+);
+const denseLookupThreads = [
+  ...Array.from({ length: 52 }, (_, index) => ({
+    id: `inbox-only-${index}`,
+    title: `Inbox Only ${index}`,
+    nickname: `Inbox Only ${index}`,
+    project: "codims",
+    parent_id: `inbox-only-${index}`,
+    parent_title: `Inbox Only ${index}`,
+    state: "RECENT",
+    updated_at_ms: sceneMaxAgeNowMs - 2 * 60 * 60 * 1000,
+  })),
+  {
+    id: "rendered-fresh",
+    title: "Rendered Fresh",
+    nickname: "Rendered Fresh",
+    project: "codims",
+    parent_id: "rendered-fresh",
+    parent_title: "Rendered Fresh",
+    state: "ACTIVE",
+    updated_at_ms: sceneMaxAgeNowMs - 5 * 60 * 1000,
+  },
+];
+assert.equal(shouldUseDenseLabels(buildProjectParentGroups(denseLookupThreads)), true);
+assert.equal(
+  shouldUseDenseLabels(
+    buildProjectParentGroups(filterThreadsByMaxAge(denseLookupThreads, sceneMaxAgeNowMs, "1")),
+  ),
+  false,
 );
 
 const digestThreads = [

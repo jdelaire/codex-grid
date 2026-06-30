@@ -55,6 +55,14 @@ export function filterVisibleProjectGroups(projectGroups, showInactive) {
     .filter((projectGroup) => projectGroup.parentGroups.length > 0);
 }
 
+export function shouldUseDenseLabels(projectGroups) {
+  const renderedThreadCount = (projectGroups || []).reduce(
+    (total, projectGroup) => total + (projectGroup.threads?.length || 0),
+    0,
+  );
+  return renderedThreadCount > 48;
+}
+
 export function buildReviewItems(projectGroups, reviewedThreadIds = new Set()) {
   return allParentGroups(projectGroups).flatMap((parentGroup) =>
     (parentGroup.digestItems || []).map((item) => ({
