@@ -143,16 +143,28 @@ export function privacyPath(value, privacyMode) {
 }
 
 export function normalizePreferences(raw = {}) {
-  const active = Number(raw.activeMinutes);
-  const maxAge = Number(raw.maxAgeHours);
   return {
-    activeMinutes: active > 0 ? String(raw.activeMinutes) : "5",
-    maxAgeHours: maxAge >= 0 ? String(raw.maxAgeHours) : "12",
+    activeMinutes: normalizeNumericPreference(raw.activeMinutes, "5", (value) => value > 0),
+    maxAgeHours: normalizeNumericPreference(raw.maxAgeHours, "12", (value) => value >= 0),
     labels: raw.labels === undefined ? true : Boolean(raw.labels),
     showInactive: Boolean(raw.showInactive),
     privacy: Boolean(raw.privacy),
     density: raw.density === "compact" ? "compact" : "normal",
   };
+}
+
+function normalizeNumericPreference(raw, fallback, isValid) {
+  if (typeof raw !== "string" && typeof raw !== "number") {
+    return fallback;
+  }
+  if (typeof raw === "string" && raw.trim() === "") {
+    return fallback;
+  }
+  const value = Number(raw);
+  if (!Number.isFinite(value) || !isValid(value)) {
+    return fallback;
+  }
+  return String(value);
 }
 
 export function handoffShouldAnimate(parentGroup, thread) {

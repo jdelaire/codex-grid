@@ -89,6 +89,10 @@ assert.deepEqual(normalizePreferences({ activeMinutes: "", maxAgeHours: "-1", de
   privacy: false,
   density: "normal",
 });
+assert.equal(normalizePreferences({ activeMinutes: "5", maxAgeHours: "" }).maxAgeHours, "12");
+assert.equal(normalizePreferences({ activeMinutes: "5", maxAgeHours: "   " }).maxAgeHours, "12");
+assert.equal(normalizePreferences({ activeMinutes: "5", maxAgeHours: null }).maxAgeHours, "12");
+assert.equal(normalizePreferences({ activeMinutes: "5", maxAgeHours: "0" }).maxAgeHours, "0");
 
 const projectGroups = buildProjectParentGroups(threads);
 assert.equal(projectGroups.length, 1);
