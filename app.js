@@ -972,6 +972,11 @@ function reconcileRooms(projectGroups) {
       disposeObject3D(room);
       scene.remove(room);
       state.rooms.delete(project);
+      const label = state.roomLabels.get(project);
+      if (label) {
+        label.remove();
+        state.roomLabels.delete(project);
+      }
     }
   }
 
@@ -983,9 +988,15 @@ function reconcileRooms(projectGroups) {
       room = createRoom(project);
       state.rooms.set(project, room);
     }
+    if (!state.roomLabels.has(project)) {
+      state.roomLabels.set(project, createLabel("room-label"));
+    }
     room.position.copy(roomPosition(index, projectGroups.length, roomSpacing.gapX, roomSpacing.gapZ));
     room.userData.layout = layout;
     updateRoomSize(room, layout);
+    const label = state.roomLabels.get(project);
+    label.textContent = projectDisplayText(privacyLabel(project, state.privacy), threads.length);
+    label.dataset.project = project;
     const display = room.userData.projectDisplay;
     if (
       display &&
@@ -1544,6 +1555,7 @@ function showDetails(thread, parentGroup = null) {
   state.selectedParentKey = parentGroup?.key || null;
   state.selectedId = thread.id;
   state.selectedThread = thread;
+  updateSceneVisualStates();
   if (changedSelection) {
     dom.threadMessageInput.value = "";
     dom.threadMessageStatus.textContent = "";
@@ -1563,6 +1575,7 @@ function showDigest(parentGroup) {
   state.selectedParentKey = null;
   state.selectedId = null;
   state.selectedThread = null;
+  updateSceneVisualStates();
   state.detailSeq += 1;
   state.sendSeq += 1;
   dom.threadMessageInput.value = "";
@@ -1943,6 +1956,18 @@ function updateLabels() {
   const height = dom.scene.clientHeight;
   const vector = new THREE.Vector3();
 
+  for (const [project, label] of state.roomLabels.entries()) {
+    const room = state.rooms.get(project);
+    if (!room) {
+      continue;
+    }
+    room.userData.parts.signBack.getWorldPosition(vector);
+    vector.y += 0.72;
+    vector.project(camera);
+    label.style.left = `${(vector.x * 0.5 + 0.5) * width}px`;
+    label.style.top = `${(-vector.y * 0.5 + 0.5) * height}px`;
+  }
+
   for (const [parentKey, label] of state.parentLabels.entries()) {
     const parentAgent = state.parentAgents.get(parentKey);
     if (!parentAgent) {
@@ -2097,6 +2122,13 @@ function updatePrivacySensitiveUi() {
     if (display) {
       updateProjectDisplayTexture(display.texture, display.project, display.count, state.privacy);
       display.privacy = state.privacy;
+      const label = state.roomLabels.get(display.project);
+      if (label) {
+        label.textContent = projectDisplayText(
+          privacyLabel(display.project, state.privacy),
+          display.count,
+        );
+      }
     }
   }
 
