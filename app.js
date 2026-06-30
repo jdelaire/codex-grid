@@ -86,6 +86,8 @@ const state = {
   showInactive: false,
   density: "normal",
   search: "",
+  selectedMode: null,
+  selectedDigest: null,
   selectedId: null,
   selectedThread: null,
   threads: [],
@@ -94,6 +96,8 @@ const state = {
   agents: new Map(),
   parentLabels: new Map(),
   agentLabels: new Map(),
+  digestObjects: new Map(),
+  digestLabels: new Map(),
   handoffs: new Map(),
   detailCache: new Map(),
   detailSeq: 0,
@@ -144,6 +148,8 @@ controls.target.set(0, 0, 0);
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 const clock = new THREE.Clock();
+const CLICK_MOVE_LIMIT_PX = 6;
+let pendingPointerPick = null;
 
 const ambient = new THREE.HemisphereLight(0xcfe7ff, 0x1d1228, 2.45);
 scene.add(ambient);
@@ -489,6 +495,24 @@ function createLabel(className) {
   return label;
 }
 
+function agentGlowForState(thread) {
+  if (thread.state === "ACTIVE") {
+    return { color: 0x34d399, opacity: 0.58 };
+  }
+  if (thread.state === "DONE") {
+    return { color: 0xf59e0b, opacity: 0.28 };
+  }
+  return { color: 0x475569, opacity: 0.18 };
+}
+
+function agentBodyColor(thread, parentColorHex) {
+  return thread.state === "DONE" ? 0xb45309 : parentColorHex;
+}
+
+function agentLabelBorderColor(thread, parentCssColor) {
+  return thread.state === "DONE" ? "rgba(245, 158, 11, 0.58)" : parentCssColor;
+}
+
 function createParentAgent(parentGroup) {
   const group = new THREE.Group();
   group.userData.parentKey = parentGroup.key;
@@ -542,6 +566,7 @@ function createAgent(thread) {
   group.userData.threadId = thread.id;
 
   const color = parentColor(thread);
+  const glow = agentGlowForState(thread);
   const bodyMaterial = new THREE.MeshStandardMaterial({ color, roughness: 0.42, metalness: 0.12 });
   const headMaterial = new THREE.MeshStandardMaterial({
     color: 0xf1f5f9,
@@ -551,9 +576,9 @@ function createAgent(thread) {
     emissiveIntensity: 0.025,
   });
   const glowMaterial = new THREE.MeshBasicMaterial({
-    color: thread.state === "ACTIVE" ? 0x34d399 : 0x475569,
+    color: glow.color,
     transparent: true,
-    opacity: thread.state === "ACTIVE" ? 0.58 : 0.18,
+    opacity: glow.opacity,
   });
 
   const body = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.3, 0.82, 24), bodyMaterial);
@@ -577,6 +602,68 @@ function createAgent(thread) {
   scene.add(group);
   state.selectable.push(body, head);
   return group;
+}
+
+function digestPosition(parentPosition, parentGroup) {
+  const childCount = parentGroup.children?.length || 0;
+  const radius = childCount > 0 ? childVisualLayout(childCount - 1, childCount).radius : 1.2;
+  return parentPosition.clone().add(new THREE.Vector3(radius + 0.55, 0, -0.85));
+}
+
+function createDigestObject(parentGroup) {
+  const group = new THREE.Group();
+  group.userData.digestKey = parentGroup.key;
+
+  const baseMaterial = new THREE.MeshStandardMaterial({
+    color: 0x92400e,
+    roughness: 0.46,
+    metalness: 0.18,
+    emissive: 0x451a03,
+    emissiveIntensity: 0.18,
+  });
+  const tokenMaterial = new THREE.MeshStandardMaterial({
+    color: 0xf59e0b,
+    roughness: 0.32,
+    metalness: 0.36,
+    emissive: 0xf59e0b,
+    emissiveIntensity: 0.18,
+  });
+  const ringMaterial = new THREE.MeshBasicMaterial({
+    color: 0xfbbf24,
+    transparent: true,
+    opacity: 0.42,
+  });
+
+  const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.42, 0.18, 28), baseMaterial);
+  pedestal.position.y = 0.12;
+  pedestal.castShadow = true;
+  group.add(pedestal);
+
+  const token = new THREE.Mesh(new THREE.DodecahedronGeometry(0.28, 0), tokenMaterial);
+  token.position.y = 0.48;
+  token.castShadow = true;
+  group.add(token);
+
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.018, 8, 48), ringMaterial);
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = 0.22;
+  group.add(ring);
+
+  group.userData.parts = { pedestal, token, ring, ringMaterial };
+  group.userData.pickables = [pedestal, token, ring];
+  scene.add(group);
+  return group;
+}
+
+function updateDigestPickables(digestObject, parentGroup, room) {
+  digestObject.userData.parentGroup = parentGroup;
+  digestObject.userData.room = room;
+  for (const pickable of digestObject.userData.pickables || []) {
+    pickable.userData.parentGroupDigest = parentGroup;
+    pickable.userData.room = room;
+    pickable.userData.digestKey = parentGroup.key;
+    state.selectable.push(pickable);
+  }
 }
 
 function createHandoffCurve(start, end) {
@@ -719,6 +806,11 @@ function reconcileAgents(projectGroups) {
   const activeParentKeys = new Set(
     projectGroups.flatMap((projectGroup) => projectGroup.parentGroups.map((parentGroup) => parentGroup.key)),
   );
+  const activeDigestKeys = new Set(
+    projectGroups.flatMap((projectGroup) =>
+      projectGroup.parentGroups.map((parentGroup) => parentGroup.key),
+    ),
+  );
   const childThreads = projectGroups.flatMap((projectGroup) =>
     projectGroup.parentGroups.flatMap((parentGroup) => parentGroup.children),
   );
@@ -750,6 +842,19 @@ function reconcileAgents(projectGroups) {
       if (label) {
         label.remove();
         state.agentLabels.delete(threadId);
+      }
+    }
+  }
+
+  for (const [digestKey, digestObject] of state.digestObjects.entries()) {
+    if (!activeDigestKeys.has(digestKey)) {
+      disposeObject3D(digestObject);
+      scene.remove(digestObject);
+      state.digestObjects.delete(digestKey);
+      const label = state.digestLabels.get(digestKey);
+      if (label) {
+        label.remove();
+        state.digestLabels.delete(digestKey);
       }
     }
   }
@@ -794,6 +899,20 @@ function reconcileAgents(projectGroups) {
       parentLabel.style.borderColor = parentCssColor;
       parentLabel.style.boxShadow = parentGroup.isActive ? `0 0 24px ${parentCssColor}88` : "";
 
+      let digestObject = state.digestObjects.get(parentGroup.key);
+      if (!digestObject) {
+        digestObject = createDigestObject(parentGroup);
+        state.digestObjects.set(parentGroup.key, digestObject);
+        state.digestLabels.set(parentGroup.key, createLabel("digest-label"));
+      }
+      digestObject.position.copy(digestPosition(parentPosition, parentGroup));
+      updateDigestPickables(digestObject, parentGroup, room);
+
+      const digestLabel = state.digestLabels.get(parentGroup.key);
+      digestLabel.textContent = `${parentGroup.finishedCount || 0} done`;
+      digestLabel.dataset.digestKey = parentGroup.key;
+      digestLabel.classList.toggle("is-empty", !parentGroup.finishedCount);
+
       for (const [index, thread] of parentGroup.children.entries()) {
         const child = childPosition(parentPositions.get(parentGroup.key), index, parentGroup.children.length);
         const localPosition = child.position;
@@ -810,9 +929,10 @@ function reconcileAgents(projectGroups) {
         agent.position.copy(worldPosition);
         agent.scale.setScalar(child.layout.scale * density);
         const parts = agent.userData.parts;
-        parts.body.material.color.setHex(parentColorHex);
-        parts.glowMaterial.color.setHex(thread.state === "ACTIVE" ? 0x34d399 : 0x475569);
-        parts.glowMaterial.opacity = thread.state === "ACTIVE" ? 0.58 : 0.18;
+        const glow = agentGlowForState(thread);
+        parts.body.material.color.setHex(agentBodyColor(thread, parentColorHex));
+        parts.glowMaterial.color.setHex(glow.color);
+        parts.glowMaterial.opacity = glow.opacity;
         parts.body.userData.threadId = thread.id;
         parts.body.userData.thread = thread;
         parts.body.userData.room = room;
@@ -824,10 +944,11 @@ function reconcileAgents(projectGroups) {
         const label = state.agentLabels.get(thread.id);
         label.textContent = privacyLabel(thread.nickname || "agent", state.privacy);
         label.classList.toggle("is-active", thread.state === "ACTIVE");
+        label.classList.toggle("is-done", thread.state === "DONE");
         label.dataset.threadId = thread.id;
         label.dataset.parentId = thread.parent_id || thread.id;
         label.dataset.roomIndex = String(index);
-        label.style.borderColor = parentCssColor;
+        label.style.borderColor = agentLabelBorderColor(thread, parentCssColor);
         label.style.boxShadow = thread.state === "ACTIVE" ? `0 0 16px ${parentCssColor}66` : "";
 
         const handoffKey = `${parentGroup.key}:${thread.id}`;
@@ -946,12 +1067,22 @@ async function refreshThreads() {
     reconcileAgents(projectGroups);
     updateCounters(projectGroups);
     updateStatus(payload);
-    if (state.selectedId) {
+    if (state.selectedMode === "digest" && state.selectedDigest?.key) {
+      const selectedDigest = projectGroups
+        .flatMap((projectGroup) => projectGroup.parentGroups)
+        .find((parentGroup) => parentGroup.key === state.selectedDigest.key);
+      if (selectedDigest) {
+        renderDigestDetails(selectedDigest);
+      } else {
+        clearDetails();
+      }
+    } else if (state.selectedId) {
       const selected = projectGroups
         .flatMap((projectGroup) => projectGroup.threads)
         .find((thread) => thread.id === state.selectedId);
-      if (selected) {
-        renderDetails(selected);
+      const selectedFromPayload = selected || state.threads.find((thread) => thread.id === state.selectedId);
+      if (selectedFromPayload) {
+        renderDetails(selectedFromPayload);
       } else {
         const selectedParent = [...state.parentAgents.values()]
           .map((agent) => agent.userData.thread)
@@ -973,6 +1104,8 @@ async function refreshThreads() {
 
 function showDetails(thread) {
   const changedSelection = state.selectedId !== thread.id;
+  state.selectedMode = "thread";
+  state.selectedDigest = null;
   state.selectedId = thread.id;
   state.selectedThread = thread;
   if (changedSelection) {
@@ -981,6 +1114,18 @@ function showDetails(thread) {
   }
   renderDetails(thread);
   loadThreadDetail(thread);
+}
+
+function showDigest(parentGroup) {
+  state.selectedMode = "digest";
+  state.selectedDigest = parentGroup;
+  state.selectedId = null;
+  state.selectedThread = null;
+  state.detailSeq += 1;
+  state.sendSeq += 1;
+  dom.threadMessageInput.value = "";
+  dom.threadMessageStatus.textContent = "";
+  renderDigestDetails(parentGroup);
 }
 
 function canSendToThread(_thread) {
@@ -1006,12 +1151,16 @@ function updateMessageComposer(thread) {
 }
 
 function renderDetails(thread) {
+  state.selectedMode = "thread";
+  state.selectedDigest = null;
   state.selectedThread = thread;
   updateAgentLabelVisibility();
   dom.detailsEmpty.hidden = true;
   dom.detailsContent.hidden = false;
   dom.detailNickname.textContent = privacyLabel(thread.nickname || "agent", state.privacy);
   dom.detailState.textContent = `${thread.state} / ${thread.intensity}`;
+  dom.detailState.classList.toggle("is-done", thread.state === "DONE");
+  dom.detailState.classList.toggle("is-digest", false);
   dom.detailRole.textContent = thread.role || "thread";
   dom.detailProject.textContent = privacyLabel(thread.project || "unknown", state.privacy);
   dom.detailAge.textContent = formatAge(thread.age_seconds);
@@ -1025,8 +1174,85 @@ function renderDetails(thread) {
   updateMessageComposer(thread);
 }
 
+function digestDetailThread(item) {
+  const thread = state.threads.find((candidate) => candidate.id === item.id);
+  return thread || {
+    ...item,
+    state: "DONE",
+    intensity: "digest",
+    cwd: "",
+  };
+}
+
+function renderDigestDetails(parentGroup) {
+  state.selectedDigest = parentGroup;
+  updateAgentLabelVisibility();
+  dom.detailsEmpty.hidden = true;
+  dom.detailsContent.hidden = false;
+  dom.detailNickname.textContent = privacyLabel(parentGroup.title || "Finished agents", state.privacy);
+  dom.detailState.textContent = "DONE DIGEST";
+  dom.detailState.classList.toggle("is-done", false);
+  dom.detailState.classList.toggle("is-digest", true);
+  dom.detailRole.textContent = "digest";
+  dom.detailProject.textContent = privacyLabel(parentGroup.project || "unknown", state.privacy);
+  dom.detailAge.textContent = parentGroup.latestFinishedAt
+    ? formatAge(Math.max(0, Math.floor((Date.now() - parentGroup.latestFinishedAt) / 1000)))
+    : "(none)";
+  dom.detailTitle.textContent = `${parentGroup.finishedCount || 0} finished agent${
+    parentGroup.finishedCount === 1 ? "" : "s"
+  }`;
+  dom.detailParent.textContent = privacyLabel(parentGroup.parentId || "(none)", state.privacy);
+  dom.detailCwd.textContent = parentGroup.latestFinishedAt
+    ? new Date(parentGroup.latestFinishedAt).toLocaleString()
+    : "(none)";
+  dom.detailId.textContent = privacyLabel(parentGroup.key, state.privacy);
+
+  const items = (parentGroup.digestItems || []).slice().sort((left, right) => {
+    return (right.updated_at_ms || 0) - (left.updated_at_ms || 0);
+  });
+  const list = document.createElement("div");
+  list.className = "digest-list";
+
+  if (!items.length) {
+    const empty = document.createElement("p");
+    empty.className = "digest-empty";
+    empty.textContent = "No finished agents captured.";
+    list.appendChild(empty);
+  }
+
+  for (const item of items) {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "digest-card";
+    card.addEventListener("click", () => showDetails(digestDetailThread(item)));
+
+    const meta = document.createElement("span");
+    meta.className = "digest-card-meta";
+    meta.textContent = `${privacyLabel(item.nickname || "agent", state.privacy)} / ${formatAge(
+      item.age_seconds || 0,
+    )}`;
+
+    const title = document.createElement("span");
+    title.className = "digest-card-title";
+    title.textContent = privacyLabel(item.title || "(untitled)", state.privacy);
+
+    const response = document.createElement("span");
+    response.className = "digest-card-response";
+    response.textContent = state.privacy ? "Hidden" : item.last_response_snippet || "No response captured";
+
+    card.replaceChildren(meta, title, response);
+    list.appendChild(card);
+  }
+
+  dom.detailThreadContent.replaceChildren(list);
+  updateMessageComposer(null);
+}
+
 async function loadThreadDetail(thread) {
   if (state.detailCache.has(thread.id)) {
+    if (state.selectedMode !== "thread" || state.selectedId !== thread.id) {
+      return;
+    }
     renderDetails({ ...thread, ...state.detailCache.get(thread.id) });
     return;
   }
@@ -1034,7 +1260,7 @@ async function loadThreadDetail(thread) {
   const seq = ++state.detailSeq;
   try {
     const payload = await fetchThreadDetail(thread.id);
-    if (seq !== state.detailSeq || state.selectedId !== thread.id) {
+    if (seq !== state.detailSeq || state.selectedMode !== "thread" || state.selectedId !== thread.id) {
       return;
     }
     if (payload.error) {
@@ -1044,7 +1270,7 @@ async function loadThreadDetail(thread) {
     state.detailCache.set(thread.id, detail);
     renderDetails({ ...thread, ...detail });
   } catch (error) {
-    if (seq !== state.detailSeq || state.selectedId !== thread.id) {
+    if (seq !== state.detailSeq || state.selectedMode !== "thread" || state.selectedId !== thread.id) {
       return;
     }
     dom.detailThreadContent.textContent = state.privacy
@@ -1054,6 +1280,8 @@ async function loadThreadDetail(thread) {
 }
 
 function clearDetails() {
+  state.selectedMode = null;
+  state.selectedDigest = null;
   state.selectedId = null;
   state.selectedThread = null;
   updateAgentLabelVisibility();
@@ -1096,7 +1324,7 @@ function updateCameraFocus(nowMs) {
   }
 }
 
-function onPointerDown(event) {
+function pickSceneAt(event) {
   const rect = renderer.domElement.getBoundingClientRect();
   pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
   pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
@@ -1110,11 +1338,45 @@ function onPointerDown(event) {
   if (room) {
     focusCameraOnRoom(room);
   }
+  const parentGroupDigest = picked.userData.parentGroupDigest;
+  if (parentGroupDigest) {
+    showDigest(parentGroupDigest);
+    return;
+  }
   const threadId = picked.userData.threadId;
   const thread = picked.userData.thread || state.threads.find((item) => item.id === threadId);
   if (thread) {
     showDetails(thread);
   }
+}
+
+function onPointerDown(event) {
+  if (event.button !== 0) {
+    pendingPointerPick = null;
+    return;
+  }
+  pendingPointerPick = {
+    pointerId: event.pointerId,
+    x: event.clientX,
+    y: event.clientY,
+  };
+}
+
+function onPointerUp(event) {
+  if (!pendingPointerPick || pendingPointerPick.pointerId !== event.pointerId) {
+    pendingPointerPick = null;
+    return;
+  }
+  const distance = Math.hypot(event.clientX - pendingPointerPick.x, event.clientY - pendingPointerPick.y);
+  pendingPointerPick = null;
+  if (distance > CLICK_MOVE_LIMIT_PX) {
+    return;
+  }
+  pickSceneAt(event);
+}
+
+function onPointerCancel() {
+  pendingPointerPick = null;
 }
 
 function updateLabels() {
@@ -1139,6 +1401,17 @@ function updateLabels() {
       continue;
     }
     vector.set(agent.position.x, agent.position.y + (agent.userData.labelHeight || 1.72), agent.position.z);
+    vector.project(camera);
+    label.style.left = `${(vector.x * 0.5 + 0.5) * width}px`;
+    label.style.top = `${(-vector.y * 0.5 + 0.5) * height}px`;
+  }
+
+  for (const [digestKey, label] of state.digestLabels.entries()) {
+    const digestObject = state.digestObjects.get(digestKey);
+    if (!digestObject) {
+      continue;
+    }
+    vector.set(digestObject.position.x, digestObject.position.y + 1.12, digestObject.position.z);
     vector.project(camera);
     label.style.left = `${(vector.x * 0.5 + 0.5) * width}px`;
     label.style.top = `${(-vector.y * 0.5 + 0.5) * height}px`;
@@ -1177,11 +1450,23 @@ function animateAgents(elapsed) {
       agent.position.y = Math.sin(elapsed * speed + hashString(thread.id)) * 0.08;
       parts.head.rotation.z = Math.sin(elapsed * speed) * 0.08;
       parts.ring.scale.setScalar(1 + Math.sin(elapsed * speed) * 0.08);
+    } else if (thread.state === "DONE") {
+      agent.position.y = 0;
+      parts.head.rotation.z = 0;
+      parts.ring.scale.setScalar(1);
     } else {
       agent.position.y = Math.sin(elapsed * 1.2 + hashString(thread.id)) * 0.018;
       parts.head.rotation.z = Math.sin(elapsed * 0.8) * 0.025;
       parts.ring.scale.setScalar(1);
     }
+  }
+
+  for (const digestObject of state.digestObjects.values()) {
+    const parts = digestObject.userData.parts;
+    const pulse = 1 + Math.sin(elapsed * 1.7 + hashString(digestObject.userData.digestKey || "")) * 0.035;
+    parts.token.rotation.y = elapsed * 0.28;
+    parts.ring.scale.setScalar(pulse);
+    parts.ringMaterial.opacity = 0.36 + (pulse - 1) * 1.2;
   }
 }
 
@@ -1361,6 +1646,8 @@ async function sendConfirmedThreadMessage() {
 function bindEvents() {
   window.addEventListener("resize", resize);
   renderer.domElement.addEventListener("pointerdown", onPointerDown);
+  renderer.domElement.addEventListener("pointerup", onPointerUp);
+  renderer.domElement.addEventListener("pointercancel", onPointerCancel);
   dom.controls.addEventListener("submit", (event) => {
     event.preventDefault();
     savePreferences();

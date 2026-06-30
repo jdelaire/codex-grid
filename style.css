@@ -211,6 +211,7 @@ h1::before {
 }
 
 .agent-label,
+.digest-label,
 .parent-label,
 .room-label {
   position: absolute;
@@ -264,6 +265,30 @@ h1::before {
   color: #dcfce7;
   border-color: rgba(52, 211, 153, 0.55);
   box-shadow: 0 0 18px rgba(52, 211, 153, 0.22), 0 10px 26px rgba(0, 0, 0, 0.3);
+}
+
+.agent-label.is-done {
+  color: #fef3c7;
+  border-color: rgba(245, 158, 11, 0.58);
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.18), 0 10px 26px rgba(0, 0, 0, 0.3);
+}
+
+.digest-label {
+  z-index: 5;
+  color: #fef3c7;
+  border-color: rgba(251, 191, 36, 0.72);
+  background: linear-gradient(180deg, rgba(69, 26, 3, 0.9), rgba(24, 13, 5, 0.86));
+  font-size: 11px;
+  font-weight: 760;
+  text-transform: uppercase;
+  letter-spacing: 0;
+  box-shadow: 0 0 18px rgba(245, 158, 11, 0.22), 0 10px 26px rgba(0, 0, 0, 0.32);
+}
+
+.digest-label.is-empty {
+  color: #d6c5a2;
+  border-color: rgba(245, 158, 11, 0.34);
+  opacity: 0.82;
 }
 
 .parent-label.is-active {
@@ -325,6 +350,14 @@ h1::before {
   box-shadow: 0 0 18px rgba(52, 211, 153, 0.12);
 }
 
+#detailState.is-done,
+#detailState.is-digest {
+  color: #fef3c7;
+  border-color: rgba(245, 158, 11, 0.5);
+  background: rgba(245, 158, 11, 0.1);
+  box-shadow: 0 0 18px rgba(245, 158, 11, 0.13);
+}
+
 dl {
   display: grid;
   gap: 10px;
@@ -362,6 +395,65 @@ dd {
   background: rgba(4, 7, 13, 0.58);
   padding: 12px;
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+}
+
+.digest-list {
+  display: grid;
+  gap: 8px;
+}
+
+.digest-empty {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.digest-card {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  border: 1px solid rgba(172, 188, 209, 0.18);
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.62);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  padding: 9px 10px;
+  text-align: left;
+  transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.digest-card:hover {
+  border-color: rgba(34, 211, 238, 0.48);
+  background: rgba(20, 31, 49, 0.82);
+  transform: translateY(-1px);
+}
+
+.digest-card:focus-visible {
+  outline: 2px solid rgba(34, 211, 238, 0.45);
+  outline-offset: 2px;
+}
+
+.digest-card-meta {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.25;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.digest-card-title {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.digest-card-response {
+  color: #cbd5e1;
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .thread-message {
