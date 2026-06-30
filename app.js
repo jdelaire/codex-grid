@@ -78,6 +78,7 @@ const state = {
   detailCache: new Map(),
   detailSeq: 0,
   sendSeq: 0,
+  sendPending: false,
   cameraFocus: null,
   selectable: [],
   refreshSeq: 0,
@@ -937,12 +938,18 @@ function canSendToThread(thread) {
   return thread?.role === "thread";
 }
 
+function updateThreadSendControls(thread) {
+  const disabled = state.sendPending || !canSendToThread(thread);
+  dom.threadMessagePreview.disabled = disabled;
+  dom.threadMessageSubmit.disabled = disabled;
+  dom.sendConfirmSubmit.disabled = disabled;
+}
+
 function updateMessageComposer(thread) {
   const canSend = canSendToThread(thread);
   dom.threadMessageForm.hidden = !canSend;
   dom.threadMessageInput.disabled = !canSend;
-  dom.threadMessagePreview.disabled = !canSend;
-  dom.threadMessageSubmit.disabled = !canSend;
+  updateThreadSendControls(thread);
   if (!canSend) {
     dom.threadMessageInput.value = "";
     dom.threadMessageStatus.textContent = "";
@@ -1170,6 +1177,9 @@ async function onThreadMessageSubmit(event) {
 }
 
 function showSendConfirmation() {
+  if (state.sendPending) {
+    return;
+  }
   const thread = state.selectedThread;
   const message = dom.threadMessageInput.value.trim();
   if (!canSendToThread(thread)) {
@@ -1181,17 +1191,23 @@ function showSendConfirmation() {
   }
   dom.sendConfirmTarget.textContent = `${thread.title || thread.nickname} (${thread.id})`;
   dom.sendConfirmMessage.textContent = message;
+  dom.sendConfirmDialog.returnValue = "";
   dom.sendConfirmDialog.showModal();
 }
 
 async function onSendConfirmClose() {
-  if (dom.sendConfirmDialog.returnValue !== "send") {
+  const returnValue = dom.sendConfirmDialog.returnValue;
+  dom.sendConfirmDialog.returnValue = "";
+  if (returnValue !== "send") {
     return;
   }
   await sendConfirmedThreadMessage();
 }
 
 async function sendConfirmedThreadMessage() {
+  if (state.sendPending) {
+    return;
+  }
   const thread = state.selectedThread;
   if (!canSendToThread(thread)) {
     return;
@@ -1204,7 +1220,8 @@ async function sendConfirmedThreadMessage() {
   }
 
   const seq = ++state.sendSeq;
-  dom.threadMessageSubmit.disabled = true;
+  state.sendPending = true;
+  updateThreadSendControls(thread);
   dom.threadMessageStatus.textContent = "Sending...";
 
   try {
@@ -1226,8 +1243,9 @@ async function sendConfirmedThreadMessage() {
     }
     dom.threadMessageStatus.textContent = `Send failed: ${error.message}`;
   } finally {
-    if (seq === state.sendSeq && state.selectedId === thread.id) {
-      dom.threadMessageSubmit.disabled = !canSendToThread(state.selectedThread);
+    if (seq === state.sendSeq) {
+      state.sendPending = false;
+      updateMessageComposer(state.selectedThread);
     }
   }
 }
