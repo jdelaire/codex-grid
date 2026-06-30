@@ -1026,8 +1026,9 @@ async function refreshThreads() {
       const selected = projectGroups
         .flatMap((projectGroup) => projectGroup.threads)
         .find((thread) => thread.id === state.selectedId);
-      if (selected) {
-        renderDetails(selected);
+      const selectedFromPayload = selected || state.threads.find((thread) => thread.id === state.selectedId);
+      if (selectedFromPayload) {
+        renderDetails(selectedFromPayload);
       } else {
         const selectedParent = [...state.parentAgents.values()]
           .map((agent) => agent.userData.thread)
@@ -1097,6 +1098,8 @@ function renderDetails(thread) {
   dom.detailsContent.hidden = false;
   dom.detailNickname.textContent = thread.nickname || "agent";
   dom.detailState.textContent = `${thread.state} / ${thread.intensity}`;
+  dom.detailState.classList.toggle("is-done", thread.state === "DONE");
+  dom.detailState.classList.toggle("is-digest", false);
   dom.detailRole.textContent = thread.role || "thread";
   dom.detailProject.textContent = thread.project || "unknown";
   dom.detailAge.textContent = formatAge(thread.age_seconds);
@@ -1127,6 +1130,8 @@ function renderDigestDetails(parentGroup) {
   dom.detailsContent.hidden = false;
   dom.detailNickname.textContent = parentGroup.title || "Finished agents";
   dom.detailState.textContent = "DONE DIGEST";
+  dom.detailState.classList.toggle("is-done", false);
+  dom.detailState.classList.toggle("is-digest", true);
   dom.detailRole.textContent = "digest";
   dom.detailProject.textContent = parentGroup.project || "unknown";
   dom.detailAge.textContent = parentGroup.latestFinishedAt
