@@ -1318,9 +1318,10 @@ function updateAgentLabelVisibility() {
     const layoutRing = Number(label.dataset.layoutRing || "0");
     const selected = threadId === state.selectedId;
     const running = thread?.state === "ACTIVE";
+    const keepRunningLabel = running && (layoutRing <= 1 || roomIndex < 12);
     label.hidden = Boolean(
       dense &&
-        !running &&
+        !keepRunningLabel &&
         !selected &&
         (layoutRing >= 2 || roomIndex >= 8),
     );
