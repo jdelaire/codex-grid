@@ -189,6 +189,23 @@ export function filterThreadsByMaxAge(threads, generatedAtMs, maxAgeHours) {
 }
 
 export function buildParentTimeline(parentGroup, reviewedThreadIds = new Set()) {
+  const digestIds = new Set((parentGroup?.digestItems || []).map((item) => item.id));
+  const childIds = new Set((parentGroup?.children || []).map((thread) => thread.id));
+  const activeLeadItems =
+    parentGroup?.lead?.state === "ACTIVE" &&
+    !childIds.has(parentGroup.lead.id) &&
+    !digestIds.has(parentGroup.lead.id)
+      ? [
+          {
+            ...parentGroup.lead,
+            type: "active",
+            parentId: parentGroup.parentId,
+            parentKey: parentGroup.key,
+            parentTitle: parentGroup.title,
+            reviewed: false,
+          },
+        ]
+      : [];
   const activeItems = (parentGroup?.children || [])
     .filter((thread) => thread.state === "ACTIVE")
     .map((thread) => ({
@@ -210,7 +227,7 @@ export function buildParentTimeline(parentGroup, reviewedThreadIds = new Set()) 
     reviewed: reviewedThreadIds.has(item.id),
   }));
 
-  return [...activeItems, ...finishedItems]
+  return [...activeLeadItems, ...activeItems, ...finishedItems]
     .map((item, index) => ({ item, index }))
     .sort((left, right) => {
       const updatedDelta = (right.item.updated_at_ms || 0) - (left.item.updated_at_ms || 0);

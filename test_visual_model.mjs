@@ -297,6 +297,27 @@ assert.deepEqual(
     { id: "parent", type: "finished", reviewed: false },
   ],
 );
+const soloActiveGroup = buildProjectParentGroups([
+  {
+    id: "solo-active",
+    title: "Solo active",
+    nickname: "Solo active",
+    project: "codims",
+    parent_id: "solo-active",
+    parent_title: "Solo active",
+    state: "ACTIVE",
+    intensity: "working",
+    updated_at_ms: 9000,
+  },
+])[0].parentGroups[0];
+assert.deepEqual(
+  buildParentTimeline(soloActiveGroup, new Set()).map((item) => ({
+    id: item.id,
+    type: item.type,
+    reviewed: item.reviewed,
+  })),
+  [{ id: "solo-active", type: "active", reviewed: false }],
+);
 
 const actionInbox = buildActionInbox(projectGroups, reviewedThreadIds, { staleBeforeMs: 8000 });
 assert.deepEqual(actionInbox.counts, {
