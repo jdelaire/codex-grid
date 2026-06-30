@@ -125,6 +125,7 @@ const focusStudio = {
 
 const PREFS_KEY = "codims.preferences.v1";
 const REVIEWED_THREADS_KEY = "codims.reviewedThreads.v1";
+const SELECTED_LABEL_BORDER = "rgba(224, 242, 254, 0.82)";
 
 function loadPreferences() {
   try {
@@ -913,6 +914,7 @@ function updateParentVisualState(parentAgent, parentKey) {
   const label = state.parentLabels.get(parentKey);
   if (label) {
     label.classList.toggle("is-selected", selected);
+    label.style.borderColor = selected ? SELECTED_LABEL_BORDER : label.dataset.borderColor || "";
   }
 }
 
@@ -926,6 +928,7 @@ function updateAgentVisualState(agent, threadId) {
   const label = state.agentLabels.get(threadId);
   if (label) {
     label.classList.toggle("is-selected", selected);
+    label.style.borderColor = selected ? SELECTED_LABEL_BORDER : label.dataset.borderColor || "";
   }
 }
 
@@ -1113,6 +1116,7 @@ function reconcileAgents(projectGroups) {
       );
       parentLabel.classList.toggle("is-active", parentGroup.isActive);
       parentLabel.dataset.parentKey = parentGroup.key;
+      parentLabel.dataset.borderColor = parentCssColor;
       parentLabel.style.borderColor = parentCssColor;
       parentLabel.style.boxShadow = "";
 
@@ -1171,7 +1175,9 @@ function reconcileAgents(projectGroups) {
         label.dataset.threadId = thread.id;
         label.dataset.parentId = thread.parent_id || thread.id;
         label.dataset.roomIndex = String(index);
-        label.style.borderColor = agentLabelBorderColor(thread, parentCssColor);
+        const agentBorderColor = agentLabelBorderColor(thread, parentCssColor);
+        label.dataset.borderColor = agentBorderColor;
+        label.style.borderColor = agentBorderColor;
         label.style.boxShadow = "";
 
         const handoffKey = `${parentGroup.key}:${thread.id}`;
@@ -1501,7 +1507,14 @@ async function refreshThreads() {
     updateCounters(projectGroups);
     renderReviewLane();
     updateStatus(payload);
-    if (state.selectedMode === "digest" && state.selectedDigest?.key) {
+    if (state.selectedMode === "room") {
+      const selectedProjectVisible = projectGroups.some(
+        (projectGroup) => projectGroup.project === state.selectedProject,
+      );
+      if (!state.selectedProject || !selectedProjectVisible || !state.rooms.has(state.selectedProject)) {
+        clearDetails();
+      }
+    } else if (state.selectedMode === "digest" && state.selectedDigest?.key) {
       const selectedDigest = projectGroups
         .flatMap((projectGroup) => projectGroup.parentGroups)
         .find((parentGroup) => parentGroup.key === state.selectedDigest.key);
@@ -2032,9 +2045,11 @@ function animateAgents(elapsed) {
     const selected = selectedSceneObject({ type: "agent", threadId: thread.id });
     if (thread.state === "ACTIVE") {
       const speed = thread.intensity === "energetic" ? 5.8 : 3.4;
+      const pulse = Math.sin(elapsed * speed) * 0.08;
+      const ringScale = 1 + pulse;
       agent.position.y = Math.sin(elapsed * speed + hashString(thread.id)) * 0.08;
-      parts.head.rotation.z = Math.sin(elapsed * speed) * 0.08;
-      parts.ring.scale.setScalar(1 + Math.sin(elapsed * speed) * 0.08);
+      parts.head.rotation.z = pulse;
+      parts.ring.scale.setScalar(selected ? Math.max(1.12, ringScale) : ringScale);
     } else if (thread.state === "DONE") {
       agent.position.y = 0;
       parts.head.rotation.z = 0;
@@ -2059,8 +2074,12 @@ function animateAgents(elapsed) {
       continue;
     }
     const pulse = 1 + Math.sin(elapsed * 1.7 + hashString(digestObject.userData.digestKey || "")) * 0.035;
+    const selected = selectedSceneObject({
+      type: "digest",
+      digestKey: digestObject.userData.digestKey,
+    });
     parts.token.rotation.y = elapsed * 0.28;
-    parts.ring.scale.setScalar(pulse);
+    parts.ring.scale.setScalar(selected ? Math.max(1.12, pulse) : pulse);
     parts.ringMaterial.opacity = 0.34;
   }
 }
