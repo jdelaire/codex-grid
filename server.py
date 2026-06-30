@@ -383,6 +383,7 @@ def empty_payload(now_ms, error):
         "source": "codex_app_server",
         "threads": [],
         "counts": {"active": 0, "visible": 0, "projects": 0},
+        "capabilities": {"read_threads": False, "send_messages": False},
         "generated_at_ms": now_ms,
         "error": str(error),
     }
@@ -603,7 +604,9 @@ def get_threads_payload(
     except (AppServerError, OSError, ValueError) as error:
         return empty_payload(now_ms, error)
 
-    return build_payload(threads, now_ms, active_minutes)
+    payload = build_payload(threads, now_ms, active_minutes)
+    payload["capabilities"] = {"read_threads": True, "send_messages": True}
+    return payload
 
 
 class CodimsRequestHandler(SimpleHTTPRequestHandler):

@@ -856,7 +856,8 @@ function updateStatus(payload) {
     return;
   }
   const generated = new Date(payload.generated_at_ms);
-  dom.statusText.textContent = `Updated ${generated.toLocaleTimeString()} from Codex app-server`;
+  const sendStatus = payload.capabilities?.send_messages === false ? " · read-only" : "";
+  dom.statusText.textContent = `Updated ${generated.toLocaleTimeString()} from Codex app-server${sendStatus}`;
 }
 
 async function fetchThreads() {

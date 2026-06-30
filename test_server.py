@@ -73,6 +73,20 @@ class FakeAppServerClient:
 
 
 class ServerThreadPayloadTests(unittest.TestCase):
+    def test_payload_includes_capabilities(self):
+        fake = FakeAppServerClient(
+            {
+                ("thread/list", None): {"data": [], "nextCursor": None},
+            }
+        )
+
+        payload = server.get_threads_payload(client_factory=lambda: fake, now_ms=NOW_MS)
+
+        self.assertEqual(
+            payload["capabilities"],
+            {"read_threads": True, "send_messages": True},
+        )
+
     def test_payload_reads_app_server_subagents_and_shapes_json(self):
         fake = FakeAppServerClient(
             {
