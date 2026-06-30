@@ -104,17 +104,21 @@ const state = {
 };
 
 function savePreferences() {
-  localStorage.setItem(
-    PREFS_KEY,
-    JSON.stringify({
-      activeMinutes: dom.activeMinutes.value,
-      maxAgeHours: dom.maxAgeHours.value,
-      labels: state.labels,
-      showInactive: state.showInactive,
-      privacy: state.privacy,
-      density: state.density,
-    }),
-  );
+  try {
+    localStorage.setItem(
+      PREFS_KEY,
+      JSON.stringify({
+        activeMinutes: dom.activeMinutes.value,
+        maxAgeHours: dom.maxAgeHours.value,
+        labels: state.labels,
+        showInactive: state.showInactive,
+        privacy: state.privacy,
+        density: state.density,
+      }),
+    );
+  } catch {
+    // Non-persistent controls are acceptable when storage is unavailable.
+  }
 }
 
 const scene = new THREE.Scene();
