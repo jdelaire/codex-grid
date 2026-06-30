@@ -19,6 +19,7 @@ import {
   projectDisplayText,
   projectRoomGridSpacing,
   projectRoomLayout,
+  reviewStateForParentGroup,
   roomCameraFocus,
   serializeReviewedThreadIds,
   shouldPollThreads,
@@ -701,10 +702,26 @@ function createDigestObject(parentGroup) {
   ring.position.y = 0.22;
   group.add(ring);
 
-  group.userData.parts = { pedestal, token, ring, ringMaterial };
+  group.userData.parts = { pedestal, token, ring, baseMaterial, tokenMaterial, ringMaterial };
   group.userData.pickables = [pedestal, token, ring];
   scene.add(group);
   return group;
+}
+
+function updateDigestObjectReviewState(digestObject, reviewState) {
+  const inactive = Boolean(reviewState.doneObjectInactive);
+  const parts = digestObject.userData.parts;
+  digestObject.userData.doneObjectInactive = inactive;
+  digestObject.userData.remainingReviewCount = reviewState.unreviewed;
+
+  parts.baseMaterial.color.setHex(inactive ? 0x334155 : 0x92400e);
+  parts.baseMaterial.emissive.setHex(inactive ? 0x000000 : 0x451a03);
+  parts.baseMaterial.emissiveIntensity = inactive ? 0 : 0.18;
+  parts.tokenMaterial.color.setHex(inactive ? 0x64748b : 0xf59e0b);
+  parts.tokenMaterial.emissive.setHex(inactive ? 0x000000 : 0xf59e0b);
+  parts.tokenMaterial.emissiveIntensity = inactive ? 0 : 0.18;
+  parts.ringMaterial.color.setHex(inactive ? 0x94a3b8 : 0xfbbf24);
+  parts.ringMaterial.opacity = inactive ? 0.14 : 0.42;
 }
 
 function updateDigestPickables(digestObject, parentGroup, room) {
@@ -963,12 +980,15 @@ function reconcileAgents(projectGroups) {
         state.digestLabels.set(parentGroup.key, createLabel("digest-label"));
       }
       digestObject.position.copy(digestPosition(parentPosition, parentGroup));
+      const digestReviewState = reviewStateForParentGroup(parentGroup, state.reviewedThreadIds);
+      updateDigestObjectReviewState(digestObject, digestReviewState);
       updateDigestPickables(digestObject, parentGroup, room);
 
       const digestLabel = state.digestLabels.get(parentGroup.key);
       digestLabel.textContent = `${parentGroup.finishedCount || 0} done`;
       digestLabel.dataset.digestKey = parentGroup.key;
       digestLabel.classList.toggle("is-empty", !parentGroup.finishedCount);
+      digestLabel.classList.toggle("is-reviewed", digestReviewState.doneObjectInactive);
 
       for (const [index, thread] of parentGroup.children.entries()) {
         const child = childPosition(parentPositions.get(parentGroup.key), index, parentGroup.children.length);
@@ -1223,6 +1243,7 @@ function toggleReviewedThread(threadId) {
   }
   saveReviewedThreadIds();
   refreshActionInbox();
+  reconcileAgents(state.projectGroups);
   renderReviewLane();
   renderSelectedParentTimeline();
 }
@@ -1830,6 +1851,12 @@ function animateAgents(elapsed) {
 
   for (const digestObject of state.digestObjects.values()) {
     const parts = digestObject.userData.parts;
+    if (digestObject.userData.doneObjectInactive) {
+      parts.token.rotation.y = 0;
+      parts.ring.scale.setScalar(1);
+      parts.ringMaterial.opacity = 0.14;
+      continue;
+    }
     const pulse = 1 + Math.sin(elapsed * 1.7 + hashString(digestObject.userData.digestKey || "")) * 0.035;
     parts.token.rotation.y = elapsed * 0.28;
     parts.ring.scale.setScalar(pulse);

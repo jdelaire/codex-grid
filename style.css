@@ -352,6 +352,14 @@ h1::before {
   opacity: 0.82;
 }
 
+.digest-label.is-reviewed {
+  color: #cbd5e1;
+  border-color: rgba(148, 163, 184, 0.36);
+  background: rgba(15, 23, 42, 0.72);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.26);
+  opacity: 0.72;
+}
+
 .empty-state {
   position: absolute;
   left: 50%;

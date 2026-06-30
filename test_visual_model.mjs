@@ -273,6 +273,7 @@ assert.deepEqual(reviewStateForParentGroup(parentGroup, reviewedThreadIds), {
   reviewed: 1,
   unreviewed: 2,
   needsReview: true,
+  doneObjectInactive: false,
 });
 assert.deepEqual(reviewStateForParentGroup(soloGroup, reviewedThreadIds), {
   parentId: "solo",
@@ -283,6 +284,7 @@ assert.deepEqual(reviewStateForParentGroup(soloGroup, reviewedThreadIds), {
   reviewed: 1,
   unreviewed: 0,
   needsReview: false,
+  doneObjectInactive: true,
 });
 assert.deepEqual(
   buildParentTimeline(parentGroup, reviewedThreadIds).map((item) => ({

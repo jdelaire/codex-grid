@@ -113,6 +113,7 @@ export function reviewStateForParentGroup(parentGroup, reviewedThreadIds = new S
     reviewed,
     unreviewed,
     needsReview: unreviewed > 0,
+    doneObjectInactive: total > 0 && unreviewed === 0,
   };
 }
 
