@@ -215,20 +215,20 @@ function fitProjectDisplayFont(ctx, text, maxWidth) {
   return size;
 }
 
-function createProjectDisplayTexture(project, count) {
+function createProjectDisplayTexture(project, count, privacyMode = false) {
   const canvas = document.createElement("canvas");
   canvas.width = 1024;
   canvas.height = 320;
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
-  updateProjectDisplayTexture(texture, project, count);
+  updateProjectDisplayTexture(texture, project, count, privacyMode);
   return texture;
 }
 
-function updateProjectDisplayTexture(texture, project, count) {
+function updateProjectDisplayTexture(texture, project, count, privacyMode = false) {
   const canvas = texture.image;
   const ctx = canvas.getContext("2d");
-  const text = projectDisplayText(project, count);
+  const text = projectDisplayText(privacyLabel(project, privacyMode), count);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = "rgba(7, 12, 24, 0.96)";
   drawRoundedRect(ctx, 22, 24, canvas.width - 44, canvas.height - 48, 34);
@@ -322,7 +322,7 @@ function createRoom(project) {
   sideWall.receiveShadow = true;
   group.add(sideWall);
 
-  const signTexture = createProjectDisplayTexture(project, 0);
+  const signTexture = createProjectDisplayTexture(project, 0, state.privacy);
   const signBack = new THREE.Mesh(
     new THREE.BoxGeometry(5.25, 1.28, 0.16),
     new THREE.MeshStandardMaterial({
@@ -390,7 +390,7 @@ function createRoom(project) {
     pickable.userData.room = group;
     pickable.userData.project = project;
   }
-  group.userData.projectDisplay = { texture: signTexture, project, count: 0 };
+  group.userData.projectDisplay = { texture: signTexture, project, count: 0, privacy: state.privacy };
   updateRoomSize(group, { width: 9.2, depth: 6.8 });
 
   scene.add(group);
@@ -673,10 +673,14 @@ function reconcileRooms(projectGroups) {
     room.userData.layout = layout;
     updateRoomSize(room, layout);
     const display = room.userData.projectDisplay;
-    if (display && (display.project !== project || display.count !== threads.length)) {
-      updateProjectDisplayTexture(display.texture, project, threads.length);
+    if (
+      display &&
+      (display.project !== project || display.count !== threads.length || display.privacy !== state.privacy)
+    ) {
+      updateProjectDisplayTexture(display.texture, project, threads.length, state.privacy);
       display.project = project;
       display.count = threads.length;
+      display.privacy = state.privacy;
     }
   });
 }
@@ -978,13 +982,13 @@ function renderDetails(thread) {
   dom.detailNickname.textContent = privacyLabel(thread.nickname || "agent", state.privacy);
   dom.detailState.textContent = `${thread.state} / ${thread.intensity}`;
   dom.detailRole.textContent = thread.role || "thread";
-  dom.detailProject.textContent = thread.project || "unknown";
+  dom.detailProject.textContent = privacyLabel(thread.project || "unknown", state.privacy);
   dom.detailAge.textContent = formatAge(thread.age_seconds);
   dom.detailTitle.textContent = privacyLabel(thread.title || "(untitled)", state.privacy);
   const cached = state.detailCache.get(thread.id);
   const detailContent = cached ? cached.content || "(no loaded thread content)" : "Loading thread content...";
   dom.detailThreadContent.textContent = state.privacy ? "Hidden" : detailContent;
-  dom.detailParent.textContent = thread.parent_title || "(none)";
+  dom.detailParent.textContent = privacyLabel(thread.parent_title || "(none)", state.privacy);
   dom.detailCwd.textContent = privacyPath(thread.cwd || "(unknown)", state.privacy);
   dom.detailId.textContent = privacyLabel(thread.id, state.privacy);
   updateMessageComposer(thread);
@@ -1180,10 +1184,43 @@ function setLabels(nextLabels) {
   dom.labels.classList.toggle("is-hidden", !nextLabels);
 }
 
+function updatePrivacySensitiveUi() {
+  for (const [parentKey, label] of state.parentLabels.entries()) {
+    const parentGroup = state.parentAgents.get(parentKey)?.userData.parentGroup;
+    if (parentGroup) {
+      label.textContent = privacyLabel(parentGroup.title, state.privacy);
+    }
+  }
+
+  for (const [threadId, label] of state.agentLabels.entries()) {
+    const thread = state.agents.get(threadId)?.userData.thread;
+    if (thread) {
+      label.textContent = privacyLabel(thread.nickname || "agent", state.privacy);
+    }
+  }
+
+  for (const room of state.rooms.values()) {
+    const display = room.userData.projectDisplay;
+    if (display) {
+      updateProjectDisplayTexture(display.texture, display.project, display.count, state.privacy);
+      display.privacy = state.privacy;
+    }
+  }
+
+  if (state.selectedThread) {
+    renderDetails(state.selectedThread);
+  }
+
+  if (dom.sendConfirmDialog.open) {
+    updateSendConfirmTarget(state.selectedThread);
+  }
+}
+
 function setPrivacy(nextPrivacy) {
   state.privacy = nextPrivacy;
   dom.privacyToggle.setAttribute("aria-pressed", String(nextPrivacy));
   dom.privacyToggle.textContent = nextPrivacy ? "Privacy on" : "Privacy";
+  updatePrivacySensitiveUi();
   refreshThreads();
 }
 
@@ -1212,10 +1249,20 @@ function showSendConfirmation() {
     dom.threadMessageStatus.textContent = "Message is empty.";
     return;
   }
-  dom.sendConfirmTarget.textContent = `${thread.title || thread.nickname} (${thread.id})`;
+  updateSendConfirmTarget(thread);
   dom.sendConfirmMessage.textContent = message;
   dom.sendConfirmDialog.returnValue = "";
   dom.sendConfirmDialog.showModal();
+}
+
+function updateSendConfirmTarget(thread) {
+  if (!thread) {
+    dom.sendConfirmTarget.textContent = "";
+    return;
+  }
+  dom.sendConfirmTarget.textContent = state.privacy
+    ? "Hidden"
+    : `${thread.title || thread.nickname} (${thread.id})`;
 }
 
 async function onSendConfirmClose() {
