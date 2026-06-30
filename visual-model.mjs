@@ -377,6 +377,38 @@ export function threadActivityLabel(thread) {
   return "IDLE";
 }
 
+export function sceneObjectIsSelected(selection = {}, object = {}) {
+  if (!selection || !object || !selection.mode || !object.type) {
+    return false;
+  }
+  if (object.type === "room") {
+    return Boolean(
+      selection.mode === "room" && selection.project && selection.project === object.project,
+    );
+  }
+  if (object.type === "digest") {
+    return Boolean(
+      selection.mode === "digest" && selection.digestKey && selection.digestKey === object.digestKey,
+    );
+  }
+  if (object.type === "parent") {
+    if (selection.mode !== "thread") {
+      return false;
+    }
+    return Boolean(
+      (selection.parentKey && selection.parentKey === object.parentKey) ||
+        (selection.threadId && selection.threadId === object.threadId),
+    );
+  }
+  if (object.type === "agent") {
+    if (selection.mode !== "thread") {
+      return false;
+    }
+    return Boolean(selection.threadId && selection.threadId === object.threadId);
+  }
+  return false;
+}
+
 export function shouldPollThreads(live, refreshing) {
   return Boolean(live && !refreshing);
 }

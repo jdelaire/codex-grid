@@ -23,6 +23,7 @@ import {
   projectRoomLayout,
   reviewStateForParentGroup,
   roomCameraFocus,
+  sceneObjectIsSelected,
   serializeReviewedThreadIds,
   shouldPollThreads,
   shouldUseDenseLabels,
@@ -99,8 +100,32 @@ const parentPalette = [
   0x38bdf8,
 ];
 
+const focusStudio = {
+  sceneBackground: 0x04060d,
+  ambientSky: 0xb8d7f2,
+  ambientGround: 0x111827,
+  gridCenter: 0x1d283a,
+  gridLine: 0x0b1220,
+  active: 0x34d399,
+  done: 0xd97706,
+  digest: 0xf59e0b,
+  reviewed: 0x64748b,
+  room: {
+    floor: 0x101827,
+    backWall: 0x121a29,
+    sideWall: 0x0b1220,
+    signBack: 0x07101d,
+    floorGlowOpacity: 0.035,
+    borderOpacity: 0.26,
+    railOpacity: 0.3,
+    selectedGlowOpacity: 0.09,
+    selectedBorderOpacity: 0.68,
+  },
+};
+
 const PREFS_KEY = "codims.preferences.v1";
 const REVIEWED_THREADS_KEY = "codims.reviewedThreads.v1";
+const SELECTED_LABEL_BORDER = "rgba(224, 242, 254, 0.82)";
 
 function loadPreferences() {
   try {
@@ -143,6 +168,7 @@ const state = {
   projectGroups: [],
   actionInboxProjectGroups: [],
   selectedMode: null,
+  selectedProject: null,
   selectedDigest: null,
   selectedParentKey: null,
   selectedId: null,
@@ -151,6 +177,7 @@ const state = {
   rooms: new Map(),
   parentAgents: new Map(),
   agents: new Map(),
+  roomLabels: new Map(),
   parentLabels: new Map(),
   agentLabels: new Map(),
   digestObjects: new Map(),
@@ -187,7 +214,7 @@ function savePreferences() {
 }
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x050711);
+scene.background = new THREE.Color(focusStudio.sceneBackground);
 
 const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 1000);
 camera.position.set(10, 10, 14);
@@ -196,7 +223,7 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.12;
+renderer.toneMappingExposure = 1;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 dom.scene.appendChild(renderer.domElement);
@@ -211,20 +238,20 @@ const clock = new THREE.Clock();
 const CLICK_MOVE_LIMIT_PX = 6;
 let pendingPointerPick = null;
 
-const ambient = new THREE.HemisphereLight(0xcfe7ff, 0x1d1228, 2.45);
+const ambient = new THREE.HemisphereLight(focusStudio.ambientSky, focusStudio.ambientGround, 1.65);
 scene.add(ambient);
 
-const keyLight = new THREE.DirectionalLight(0xffffff, 2.8);
+const keyLight = new THREE.DirectionalLight(0xffffff, 2.35);
 keyLight.position.set(9, 16, 7);
 keyLight.castShadow = true;
 keyLight.shadow.mapSize.set(2048, 2048);
 scene.add(keyLight);
 
-const rimLight = new THREE.DirectionalLight(0x8b5cf6, 1.15);
+const rimLight = new THREE.DirectionalLight(0x7dd3fc, 0.48);
 rimLight.position.set(-10, 8, -6);
 scene.add(rimLight);
 
-const grid = new THREE.GridHelper(80, 80, 0x233047, 0x101725);
+const grid = new THREE.GridHelper(80, 80, focusStudio.gridCenter, focusStudio.gridLine);
 grid.position.y = -0.03;
 scene.add(grid);
 
@@ -326,15 +353,15 @@ function updateProjectDisplayTexture(texture, project, count, privacyMode = fals
   const ctx = canvas.getContext("2d");
   const text = projectDisplayText(privacyLabel(project, privacyMode), count);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = "rgba(7, 12, 24, 0.96)";
+  ctx.fillStyle = "rgba(5, 10, 20, 0.98)";
   drawRoundedRect(ctx, 22, 24, canvas.width - 44, canvas.height - 48, 34);
   ctx.fill();
   ctx.lineWidth = 10;
-  ctx.strokeStyle = "rgba(34, 211, 238, 0.86)";
+  ctx.strokeStyle = "rgba(125, 211, 252, 0.48)";
   ctx.stroke();
-  ctx.shadowColor = "rgba(34, 211, 238, 0.78)";
-  ctx.shadowBlur = 26;
-  ctx.fillStyle = "#dbeafe";
+  ctx.shadowColor = "rgba(125, 211, 252, 0.36)";
+  ctx.shadowBlur = 14;
+  ctx.fillStyle = "#e5eef8";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   const fontSize = fitProjectDisplayFont(ctx, text, canvas.width - 140);
@@ -352,9 +379,9 @@ function createRoom(project) {
   const floor = new THREE.Mesh(
     new THREE.BoxGeometry(1, 0.16, 1),
     new THREE.MeshStandardMaterial({
-      color: 0x141b2a,
-      roughness: 0.58,
-      metalness: 0.14,
+      color: focusStudio.room.floor,
+      roughness: 0.68,
+      metalness: 0.08,
     }),
   );
   floor.receiveShadow = true;
@@ -365,7 +392,7 @@ function createRoom(project) {
     new THREE.MeshBasicMaterial({
       color: projectAccent,
       transparent: true,
-      opacity: 0.075,
+      opacity: focusStudio.room.floorGlowOpacity,
       depthWrite: false,
     }),
   );
@@ -375,7 +402,7 @@ function createRoom(project) {
 
   const border = new THREE.LineSegments(
     new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 0.18, 1)),
-    new THREE.LineBasicMaterial({ color: projectAccent, transparent: true, opacity: 0.48 }),
+    new THREE.LineBasicMaterial({ color: projectAccent, transparent: true, opacity: focusStudio.room.borderOpacity }),
   );
   border.position.y = 0.02;
   group.add(border);
@@ -385,7 +412,7 @@ function createRoom(project) {
     new THREE.MeshBasicMaterial({
       color: projectAccent,
       transparent: true,
-      opacity: 0.62,
+      opacity: focusStudio.room.railOpacity,
     }),
   );
   group.add(frontRail);
@@ -393,11 +420,11 @@ function createRoom(project) {
   const backWall = new THREE.Mesh(
     new THREE.BoxGeometry(1, 2.2, 0.14),
     new THREE.MeshStandardMaterial({
-      color: 0x192235,
-      roughness: 0.72,
-      metalness: 0.08,
+      color: focusStudio.room.backWall,
+      roughness: 0.78,
+      metalness: 0.04,
       emissive: projectAccent,
-      emissiveIntensity: 0.015,
+      emissiveIntensity: 0.006,
     }),
   );
   backWall.position.set(0, 1.05, -3.35);
@@ -407,11 +434,11 @@ function createRoom(project) {
   const sideWall = new THREE.Mesh(
     new THREE.BoxGeometry(0.14, 2.2, 1),
     new THREE.MeshStandardMaterial({
-      color: 0x101827,
-      roughness: 0.76,
-      metalness: 0.06,
+      color: focusStudio.room.sideWall,
+      roughness: 0.8,
+      metalness: 0.04,
       emissive: projectAccent,
-      emissiveIntensity: 0.012,
+      emissiveIntensity: 0.005,
     }),
   );
   sideWall.position.set(-4.55, 1.05, 0);
@@ -422,11 +449,11 @@ function createRoom(project) {
   const signBack = new THREE.Mesh(
     new THREE.BoxGeometry(5.25, 1.28, 0.16),
     new THREE.MeshStandardMaterial({
-      color: 0x07101d,
-      emissive: 0x0b4251,
-      emissiveIntensity: 0.24,
-      roughness: 0.42,
-      metalness: 0.18,
+      color: focusStudio.room.signBack,
+      emissive: 0x0b2a35,
+      emissiveIntensity: 0.08,
+      roughness: 0.52,
+      metalness: 0.12,
     }),
   );
   signBack.position.set(0, PROJECT_SIGN_Y, -2.86);
@@ -447,7 +474,7 @@ function createRoom(project) {
   const strutMaterial = new THREE.MeshBasicMaterial({
     color: projectAccent,
     transparent: true,
-    opacity: 0.72,
+    opacity: 0.42,
   });
   const struts = [];
   for (const x of [-2.22, 2.22]) {
@@ -464,7 +491,7 @@ function createRoom(project) {
     new THREE.MeshBasicMaterial({
       color: projectAccent,
       transparent: true,
-      opacity: 0.5,
+      opacity: 0.26,
     }),
   );
   linkRail.position.set(0, 0.18, -2.86);
@@ -561,16 +588,16 @@ function visibleActivityLabel(text, isRunning) {
 
 function agentGlowForState(thread) {
   if (thread.state === "ACTIVE") {
-    return { color: 0x34d399, opacity: 0.58 };
+    return { color: focusStudio.active, opacity: 0.5 };
   }
   if (thread.state === "DONE") {
-    return { color: 0xf59e0b, opacity: 0.28 };
+    return { color: focusStudio.done, opacity: 0.18 };
   }
-  return { color: 0x475569, opacity: 0.18 };
+  return { color: 0x475569, opacity: 0.08 };
 }
 
 function agentBodyColor(thread, parentColorHex) {
-  return thread.state === "DONE" ? 0xb45309 : parentColorHex;
+  return thread.state === "DONE" ? 0x92400e : parentColorHex;
 }
 
 function agentLabelBorderColor(thread, parentCssColor) {
@@ -584,21 +611,21 @@ function createParentAgent(parentGroup) {
   const color = parentGroupColor(parentGroup);
   const bodyMaterial = new THREE.MeshStandardMaterial({
     color,
-    roughness: 0.36,
-    metalness: 0.22,
+    roughness: 0.48,
+    metalness: 0.12,
     emissive: 0x000000,
   });
   const headMaterial = new THREE.MeshStandardMaterial({
     color: 0xf8fafc,
-    roughness: 0.38,
-    metalness: 0.04,
-    emissive: 0xbfdcff,
-    emissiveIntensity: 0.04,
+    roughness: 0.5,
+    metalness: 0.02,
+    emissive: 0x9cc8ee,
+    emissiveIntensity: 0.025,
   });
   const glowMaterial = new THREE.MeshBasicMaterial({
-    color: parentGroup.isActive ? 0x34d399 : color,
+    color: parentGroup.isActive ? focusStudio.active : color,
     transparent: true,
-    opacity: parentGroup.isActive ? 0.72 : 0.24,
+    opacity: parentGroup.isActive ? 0.56 : 0.16,
   });
 
   const body = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.5, 1.18, 32), bodyMaterial);
@@ -631,13 +658,13 @@ function createAgent(thread) {
 
   const color = parentColor(thread);
   const glow = agentGlowForState(thread);
-  const bodyMaterial = new THREE.MeshStandardMaterial({ color, roughness: 0.42, metalness: 0.12 });
+  const bodyMaterial = new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.08 });
   const headMaterial = new THREE.MeshStandardMaterial({
     color: 0xf1f5f9,
-    roughness: 0.42,
-    metalness: 0.03,
-    emissive: 0xcbd5e1,
-    emissiveIntensity: 0.025,
+    roughness: 0.52,
+    metalness: 0.02,
+    emissive: 0x9ca3af,
+    emissiveIntensity: 0.015,
   });
   const glowMaterial = new THREE.MeshBasicMaterial({
     color: glow.color,
@@ -680,22 +707,22 @@ function createDigestObject(parentGroup) {
 
   const baseMaterial = new THREE.MeshStandardMaterial({
     color: 0x92400e,
-    roughness: 0.46,
-    metalness: 0.18,
+    roughness: 0.58,
+    metalness: 0.1,
     emissive: 0x451a03,
-    emissiveIntensity: 0.18,
+    emissiveIntensity: 0.1,
   });
   const tokenMaterial = new THREE.MeshStandardMaterial({
-    color: 0xf59e0b,
-    roughness: 0.32,
-    metalness: 0.36,
-    emissive: 0xf59e0b,
-    emissiveIntensity: 0.18,
+    color: focusStudio.digest,
+    roughness: 0.42,
+    metalness: 0.18,
+    emissive: focusStudio.digest,
+    emissiveIntensity: 0.14,
   });
   const ringMaterial = new THREE.MeshBasicMaterial({
     color: 0xfbbf24,
     transparent: true,
-    opacity: 0.42,
+    opacity: 0.34,
   });
 
   const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.42, 0.18, 28), baseMaterial);
@@ -725,14 +752,14 @@ function updateDigestObjectReviewState(digestObject, reviewState) {
   digestObject.userData.doneObjectInactive = inactive;
   digestObject.userData.remainingReviewCount = reviewState.unreviewed;
 
-  parts.baseMaterial.color.setHex(inactive ? 0x334155 : 0x92400e);
+  parts.baseMaterial.color.setHex(inactive ? 0x1f2937 : 0x78350f);
   parts.baseMaterial.emissive.setHex(inactive ? 0x000000 : 0x451a03);
-  parts.baseMaterial.emissiveIntensity = inactive ? 0 : 0.18;
-  parts.tokenMaterial.color.setHex(inactive ? 0x64748b : 0xf59e0b);
-  parts.tokenMaterial.emissive.setHex(inactive ? 0x000000 : 0xf59e0b);
-  parts.tokenMaterial.emissiveIntensity = inactive ? 0 : 0.18;
+  parts.baseMaterial.emissiveIntensity = inactive ? 0 : 0.1;
+  parts.tokenMaterial.color.setHex(inactive ? focusStudio.reviewed : focusStudio.digest);
+  parts.tokenMaterial.emissive.setHex(inactive ? 0x000000 : focusStudio.digest);
+  parts.tokenMaterial.emissiveIntensity = inactive ? 0 : 0.14;
   parts.ringMaterial.color.setHex(inactive ? 0x94a3b8 : 0xfbbf24);
-  parts.ringMaterial.opacity = inactive ? 0.14 : 0.42;
+  parts.ringMaterial.opacity = inactive ? 0.1 : 0.34;
 }
 
 function updateDigestPickables(digestObject, parentGroup, room) {
@@ -767,7 +794,7 @@ function createHandoff() {
   const lineMaterial = new THREE.LineBasicMaterial({
     color: 0x38bdf8,
     transparent: true,
-    opacity: 0.34,
+    opacity: 0.08,
     depthTest: false,
   });
   const line = new THREE.Line(geometry, lineMaterial);
@@ -775,7 +802,7 @@ function createHandoff() {
   const packetMaterial = new THREE.MeshBasicMaterial({
     color: 0x38bdf8,
     transparent: true,
-    opacity: 0.9,
+    opacity: 0.82,
     depthTest: false,
   });
   const packet = new THREE.Mesh(new THREE.SphereGeometry(0.11, 16, 12), packetMaterial);
@@ -783,7 +810,7 @@ function createHandoff() {
   const beamMaterial = new THREE.MeshBasicMaterial({
     color: 0x38bdf8,
     transparent: true,
-    opacity: 0.24,
+    opacity: 0.16,
     depthTest: false,
   });
   const beam = new THREE.Mesh(curveTubeGeometry(curve, 0.024), beamMaterial);
@@ -803,9 +830,9 @@ function updateHandoffGeometry(handoff, start, end, color, active) {
   parts.beam.geometry.dispose();
   parts.beam.geometry = curveTubeGeometry(curve, active ? 0.034 : 0.018);
   parts.lineMaterial.color.setHex(color);
-  parts.lineMaterial.opacity = active ? 0.9 : 0.18;
+  parts.lineMaterial.opacity = active ? 0.68 : 0.05;
   parts.beamMaterial.color.setHex(color);
-  parts.beamMaterial.opacity = active ? 0.34 : 0.07;
+  parts.beamMaterial.opacity = active ? 0.2 : 0.03;
   parts.packetMaterial.color.setHex(color);
   parts.packet.visible = active;
   parts.beam.visible = active;
@@ -840,6 +867,99 @@ function addRoomSelectables() {
   }
 }
 
+function currentSceneSelection() {
+  return {
+    mode: state.selectedMode,
+    project: state.selectedProject,
+    threadId: state.selectedId,
+    parentKey: state.selectedParentKey,
+    digestKey: state.selectedDigest?.key || null,
+  };
+}
+
+function selectedSceneObject(object) {
+  return sceneObjectIsSelected(currentSceneSelection(), object);
+}
+
+function updateRoomVisualState(room, project) {
+  const selected = selectedSceneObject({ type: "room", project });
+  const parts = room.userData.parts;
+  parts.floorGlow.material.opacity = selected
+    ? focusStudio.room.selectedGlowOpacity
+    : focusStudio.room.floorGlowOpacity;
+  parts.border.material.opacity = selected
+    ? focusStudio.room.selectedBorderOpacity
+    : focusStudio.room.borderOpacity;
+  parts.frontRail.material.opacity = selected ? 0.62 : focusStudio.room.railOpacity;
+  parts.signBack.material.emissiveIntensity = selected ? 0.16 : 0.08;
+
+  const label = state.roomLabels.get(project);
+  if (label) {
+    label.classList.toggle("is-selected", selected);
+  }
+}
+
+function updateParentVisualState(parentAgent, parentKey) {
+  const parentGroup = parentAgent.userData.parentGroup;
+  const selected = selectedSceneObject({
+    type: "parent",
+    parentKey,
+    threadId: parentGroup?.lead?.id,
+  });
+  const parts = parentAgent.userData.parts;
+  if (!parentGroup?.isActive) {
+    parts.glowMaterial.opacity = selected ? 0.34 : 0.16;
+  }
+  parts.halo.scale.setScalar(selected ? 1.12 : 1);
+  const label = state.parentLabels.get(parentKey);
+  if (label) {
+    label.classList.toggle("is-selected", selected);
+    label.style.borderColor = selected ? SELECTED_LABEL_BORDER : label.dataset.borderColor || "";
+  }
+}
+
+function updateAgentVisualState(agent, threadId) {
+  const selected = selectedSceneObject({ type: "agent", threadId });
+  const parts = agent.userData.parts;
+  if (agent.userData.thread?.state !== "ACTIVE") {
+    parts.glowMaterial.opacity = selected ? 0.34 : agentGlowForState(agent.userData.thread).opacity;
+  }
+  parts.ring.scale.setScalar(selected ? 1.12 : 1);
+  const label = state.agentLabels.get(threadId);
+  if (label) {
+    label.classList.toggle("is-selected", selected);
+    label.style.borderColor = selected ? SELECTED_LABEL_BORDER : label.dataset.borderColor || "";
+  }
+}
+
+function updateDigestVisualState(digestObject, digestKey) {
+  const selected = selectedSceneObject({ type: "digest", digestKey });
+  const parts = digestObject.userData.parts;
+  if (digestObject.userData.doneObjectInactive) {
+    parts.ringMaterial.opacity = selected ? 0.24 : 0.1;
+  }
+  parts.ring.scale.setScalar(selected ? 1.12 : 1);
+  const label = state.digestLabels.get(digestKey);
+  if (label) {
+    label.classList.toggle("is-selected", selected);
+  }
+}
+
+function updateSceneVisualStates() {
+  for (const [project, room] of state.rooms.entries()) {
+    updateRoomVisualState(room, project);
+  }
+  for (const [parentKey, parentAgent] of state.parentAgents.entries()) {
+    updateParentVisualState(parentAgent, parentKey);
+  }
+  for (const [threadId, agent] of state.agents.entries()) {
+    updateAgentVisualState(agent, threadId);
+  }
+  for (const [digestKey, digestObject] of state.digestObjects.entries()) {
+    updateDigestVisualState(digestObject, digestKey);
+  }
+}
+
 function reconcileRooms(projectGroups) {
   const activeProjects = new Set(projectGroups.map((group) => group.project));
   const roomLayouts = new Map(
@@ -855,6 +975,11 @@ function reconcileRooms(projectGroups) {
       disposeObject3D(room);
       scene.remove(room);
       state.rooms.delete(project);
+      const label = state.roomLabels.get(project);
+      if (label) {
+        label.remove();
+        state.roomLabels.delete(project);
+      }
     }
   }
 
@@ -866,9 +991,15 @@ function reconcileRooms(projectGroups) {
       room = createRoom(project);
       state.rooms.set(project, room);
     }
+    if (!state.roomLabels.has(project)) {
+      state.roomLabels.set(project, createLabel("room-label"));
+    }
     room.position.copy(roomPosition(index, projectGroups.length, roomSpacing.gapX, roomSpacing.gapZ));
     room.userData.layout = layout;
     updateRoomSize(room, layout);
+    const label = state.roomLabels.get(project);
+    label.textContent = projectDisplayText(privacyLabel(project, state.privacy), threads.length);
+    label.dataset.project = project;
     const display = room.userData.projectDisplay;
     if (
       display &&
@@ -880,6 +1011,10 @@ function reconcileRooms(projectGroups) {
       display.privacy = state.privacy;
     }
   });
+
+  for (const [project, room] of state.rooms.entries()) {
+    updateRoomVisualState(room, project);
+  }
 }
 
 function reconcileAgents(projectGroups) {
@@ -960,9 +1095,9 @@ function reconcileAgents(projectGroups) {
       const parentColorHex = parentGroupColor(parentGroup);
       parentParts.bodyMaterial.color.setHex(parentColorHex);
       parentParts.bodyMaterial.emissive.setHex(parentGroup.isActive ? parentColorHex : 0x000000);
-      parentParts.bodyMaterial.emissiveIntensity = parentGroup.isActive ? 0.15 : 0;
-      parentParts.glowMaterial.color.setHex(parentGroup.isActive ? 0x34d399 : parentColorHex);
-      parentParts.glowMaterial.opacity = parentGroup.isActive ? 0.72 : 0.24;
+      parentParts.bodyMaterial.emissiveIntensity = parentGroup.isActive ? 0.1 : 0;
+      parentParts.glowMaterial.color.setHex(parentGroup.isActive ? focusStudio.active : parentColorHex);
+      parentParts.glowMaterial.opacity = parentGroup.isActive ? 0.56 : 0.16;
       parentParts.body.userData.threadId = parentGroup.lead.id;
       parentParts.body.userData.thread = parentGroup.lead;
       parentParts.body.userData.parentGroup = parentGroup;
@@ -981,6 +1116,7 @@ function reconcileAgents(projectGroups) {
       );
       parentLabel.classList.toggle("is-active", parentGroup.isActive);
       parentLabel.dataset.parentKey = parentGroup.key;
+      parentLabel.dataset.borderColor = parentCssColor;
       parentLabel.style.borderColor = parentCssColor;
       parentLabel.style.boxShadow = "";
 
@@ -1039,7 +1175,9 @@ function reconcileAgents(projectGroups) {
         label.dataset.threadId = thread.id;
         label.dataset.parentId = thread.parent_id || thread.id;
         label.dataset.roomIndex = String(index);
-        label.style.borderColor = agentLabelBorderColor(thread, parentCssColor);
+        const agentBorderColor = agentLabelBorderColor(thread, parentCssColor);
+        label.dataset.borderColor = agentBorderColor;
+        label.style.borderColor = agentBorderColor;
         label.style.boxShadow = "";
 
         const handoffKey = `${parentGroup.key}:${thread.id}`;
@@ -1065,6 +1203,7 @@ function reconcileAgents(projectGroups) {
     }
   }
 
+  updateSceneVisualStates();
   updateAgentLabelVisibility();
 }
 
@@ -1368,7 +1507,14 @@ async function refreshThreads() {
     updateCounters(projectGroups);
     renderReviewLane();
     updateStatus(payload);
-    if (state.selectedMode === "digest" && state.selectedDigest?.key) {
+    if (state.selectedMode === "room") {
+      const selectedProjectVisible = projectGroups.some(
+        (projectGroup) => projectGroup.project === state.selectedProject,
+      );
+      if (!state.selectedProject || !selectedProjectVisible || !state.rooms.has(state.selectedProject)) {
+        clearDetails();
+      }
+    } else if (state.selectedMode === "digest" && state.selectedDigest?.key) {
       const selectedDigest = projectGroups
         .flatMap((projectGroup) => projectGroup.parentGroups)
         .find((parentGroup) => parentGroup.key === state.selectedDigest.key);
@@ -1417,10 +1563,12 @@ async function refreshThreads() {
 function showDetails(thread, parentGroup = null) {
   const changedSelection = state.selectedId !== thread.id;
   state.selectedMode = "thread";
+  state.selectedProject = null;
   state.selectedDigest = null;
   state.selectedParentKey = parentGroup?.key || null;
   state.selectedId = thread.id;
   state.selectedThread = thread;
+  updateSceneVisualStates();
   if (changedSelection) {
     dom.threadMessageInput.value = "";
     dom.threadMessageStatus.textContent = "";
@@ -1435,7 +1583,23 @@ function showDetails(thread, parentGroup = null) {
 
 function showDigest(parentGroup) {
   state.selectedMode = "digest";
+  state.selectedProject = null;
   state.selectedDigest = parentGroup;
+  state.selectedParentKey = null;
+  state.selectedId = null;
+  state.selectedThread = null;
+  updateSceneVisualStates();
+  state.detailSeq += 1;
+  state.sendSeq += 1;
+  dom.threadMessageInput.value = "";
+  dom.threadMessageStatus.textContent = "";
+  renderDigestDetails(parentGroup);
+}
+
+function showRoomFocus(room) {
+  state.selectedMode = "room";
+  state.selectedProject = room.userData.project || null;
+  state.selectedDigest = null;
   state.selectedParentKey = null;
   state.selectedId = null;
   state.selectedThread = null;
@@ -1443,7 +1607,11 @@ function showDigest(parentGroup) {
   state.sendSeq += 1;
   dom.threadMessageInput.value = "";
   dom.threadMessageStatus.textContent = "";
-  renderDigestDetails(parentGroup);
+  dom.detailsEmpty.hidden = false;
+  dom.detailsContent.hidden = true;
+  updateMessageComposer(null);
+  updateAgentLabelVisibility();
+  updateSceneVisualStates();
 }
 
 function canSendToThread(_thread) {
@@ -1684,6 +1852,7 @@ async function loadThreadDetail(thread) {
 
 function clearDetails() {
   state.selectedMode = null;
+  state.selectedProject = null;
   state.selectedDigest = null;
   state.selectedParentKey = null;
   state.selectedId = null;
@@ -1691,6 +1860,7 @@ function clearDetails() {
   updateAgentLabelVisibility();
   dom.detailsEmpty.hidden = false;
   dom.detailsContent.hidden = true;
+  updateSceneVisualStates();
   updateMessageComposer(null);
 }
 
@@ -1759,6 +1929,10 @@ function pickSceneAt(event) {
     showDetails(thread);
     return;
   }
+  if (room) {
+    showRoomFocus(room);
+    return;
+  }
   clearDetails();
 }
 
@@ -1795,6 +1969,18 @@ function updateLabels() {
   const width = dom.scene.clientWidth;
   const height = dom.scene.clientHeight;
   const vector = new THREE.Vector3();
+
+  for (const [project, label] of state.roomLabels.entries()) {
+    const room = state.rooms.get(project);
+    if (!room) {
+      continue;
+    }
+    room.userData.parts.signBack.getWorldPosition(vector);
+    vector.y += 0.72;
+    vector.project(camera);
+    label.style.left = `${(vector.x * 0.5 + 0.5) * width}px`;
+    label.style.top = `${(-vector.y * 0.5 + 0.5) * height}px`;
+  }
 
   for (const [parentKey, label] of state.parentLabels.entries()) {
     const parentAgent = state.parentAgents.get(parentKey);
@@ -1835,9 +2021,9 @@ function animateAgents(elapsed) {
     const parentGroup = parentAgent.userData.parentGroup;
     const parts = parentAgent.userData.parts;
     const speed = parentGroup?.isActive ? 2.6 : 0.8;
-    parentAgent.position.y = Math.sin(elapsed * speed + hashString(parentGroup?.parentId || "")) * (parentGroup?.isActive ? 0.06 : 0.015);
-    parts.head.rotation.z = Math.sin(elapsed * speed) * (parentGroup?.isActive ? 0.05 : 0.018);
-    parts.ring.scale.setScalar(1 + Math.sin(elapsed * speed) * (parentGroup?.isActive ? 0.1 : 0.025));
+    parentAgent.position.y = Math.sin(elapsed * speed + hashString(parentGroup?.parentId || "")) * (parentGroup?.isActive ? 0.05 : 0.008);
+    parts.head.rotation.z = Math.sin(elapsed * speed) * (parentGroup?.isActive ? 0.04 : 0.01);
+    parts.ring.scale.setScalar(1 + Math.sin(elapsed * speed) * (parentGroup?.isActive ? 0.08 : 0.012));
     parts.halo.rotation.z = elapsed * (parentGroup?.isActive ? 0.7 : 0.18);
   }
 
@@ -1857,34 +2043,45 @@ function animateAgents(elapsed) {
   for (const agent of state.agents.values()) {
     const thread = agent.userData.thread;
     const parts = agent.userData.parts;
+    const selected = selectedSceneObject({ type: "agent", threadId: thread.id });
     if (thread.state === "ACTIVE") {
       const speed = thread.intensity === "energetic" ? 5.8 : 3.4;
+      const pulse = Math.sin(elapsed * speed) * 0.08;
+      const ringScale = 1 + pulse;
       agent.position.y = Math.sin(elapsed * speed + hashString(thread.id)) * 0.08;
-      parts.head.rotation.z = Math.sin(elapsed * speed) * 0.08;
-      parts.ring.scale.setScalar(1 + Math.sin(elapsed * speed) * 0.08);
+      parts.head.rotation.z = pulse;
+      parts.ring.scale.setScalar(selected ? Math.max(1.12, ringScale) : ringScale);
     } else if (thread.state === "DONE") {
       agent.position.y = 0;
       parts.head.rotation.z = 0;
-      parts.ring.scale.setScalar(1);
+      parts.ring.scale.setScalar(selected ? 1.12 : 1);
     } else {
-      agent.position.y = Math.sin(elapsed * 1.2 + hashString(thread.id)) * 0.018;
-      parts.head.rotation.z = Math.sin(elapsed * 0.8) * 0.025;
-      parts.ring.scale.setScalar(1);
+      agent.position.y = Math.sin(elapsed * 1.2 + hashString(thread.id)) * 0.008;
+      parts.head.rotation.z = Math.sin(elapsed * 0.8) * 0.012;
+      parts.ring.scale.setScalar(selected ? 1.12 : 1);
     }
   }
 
   for (const digestObject of state.digestObjects.values()) {
     const parts = digestObject.userData.parts;
     if (digestObject.userData.doneObjectInactive) {
+      const selected = selectedSceneObject({
+        type: "digest",
+        digestKey: digestObject.userData.digestKey,
+      });
       parts.token.rotation.y = 0;
-      parts.ring.scale.setScalar(1);
-      parts.ringMaterial.opacity = 0.14;
+      parts.ring.scale.setScalar(selected ? 1.12 : 1);
+      parts.ringMaterial.opacity = selected ? 0.24 : 0.1;
       continue;
     }
     const pulse = 1 + Math.sin(elapsed * 1.7 + hashString(digestObject.userData.digestKey || "")) * 0.035;
+    const selected = selectedSceneObject({
+      type: "digest",
+      digestKey: digestObject.userData.digestKey,
+    });
     parts.token.rotation.y = elapsed * 0.28;
-    parts.ring.scale.setScalar(pulse);
-    parts.ringMaterial.opacity = 0.36 + (pulse - 1) * 1.2;
+    parts.ring.scale.setScalar(selected ? Math.max(1.12, pulse) : pulse);
+    parts.ringMaterial.opacity = 0.34;
   }
 }
 
@@ -1945,6 +2142,13 @@ function updatePrivacySensitiveUi() {
     if (display) {
       updateProjectDisplayTexture(display.texture, display.project, display.count, state.privacy);
       display.privacy = state.privacy;
+      const label = state.roomLabels.get(display.project);
+      if (label) {
+        label.textContent = projectDisplayText(
+          privacyLabel(display.project, state.privacy),
+          display.count,
+        );
+      }
     }
   }
 
