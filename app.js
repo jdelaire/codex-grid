@@ -710,7 +710,7 @@ function createDigestObject(parentGroup) {
     emissiveIntensity: 0.1,
   });
   const tokenMaterial = new THREE.MeshStandardMaterial({
-    color: 0xf59e0b,
+    color: focusStudio.digest,
     roughness: 0.42,
     metalness: 0.18,
     emissive: focusStudio.digest,
@@ -1902,13 +1902,13 @@ function animateAgents(elapsed) {
     if (digestObject.userData.doneObjectInactive) {
       parts.token.rotation.y = 0;
       parts.ring.scale.setScalar(1);
-      parts.ringMaterial.opacity = 0.14;
+      parts.ringMaterial.opacity = 0.1;
       continue;
     }
     const pulse = 1 + Math.sin(elapsed * 1.7 + hashString(digestObject.userData.digestKey || "")) * 0.035;
     parts.token.rotation.y = elapsed * 0.28;
     parts.ring.scale.setScalar(pulse);
-    parts.ringMaterial.opacity = 0.36 + (pulse - 1) * 1.2;
+    parts.ringMaterial.opacity = 0.34 + (pulse - 1) * 1.2;
   }
 }
 
