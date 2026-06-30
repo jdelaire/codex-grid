@@ -142,11 +142,11 @@ assert.deepEqual(
   parentGroup.finishedChildren.map((thread) => thread.id),
   ["child-c", "child-d"],
 );
-assert.equal(parentGroup.finishedCount, 2);
+assert.equal(parentGroup.finishedCount, 3);
 assert.equal(parentGroup.latestFinishedAt, 7000);
 assert.deepEqual(
   parentGroup.digestItems.map((thread) => thread.id),
-  ["child-c", "child-d"],
+  ["child-c", "child-d", "parent"],
 );
 assert.deepEqual(Object.keys(parentGroup.digestItems[0]), [
   "id",
@@ -181,9 +181,12 @@ assert.equal(soloGroup.title, "Separate task");
 assert.equal(soloGroup.children.length, 0);
 assert.equal(soloGroup.isHandoffActive, false);
 assert.deepEqual(soloGroup.finishedChildren, []);
-assert.equal(soloGroup.finishedCount, 0);
-assert.equal(soloGroup.latestFinishedAt, 0);
-assert.deepEqual(soloGroup.digestItems, []);
+assert.equal(soloGroup.finishedCount, 1);
+assert.equal(soloGroup.latestFinishedAt, 1000);
+assert.deepEqual(
+  soloGroup.digestItems.map((thread) => thread.id),
+  ["solo"],
+);
 
 const digestThreads = [
   {
@@ -195,7 +198,7 @@ const digestThreads = [
     parent_title: "Digest Parent",
     state: "DONE",
     updated_at_ms: 9000,
-    last_response_snippet: "Parent should not appear.",
+    last_response_snippet: "Parent done.",
   },
   ...["zeta", "alpha", "echo", "bravo", "charlie", "delta"].map((id, index) => ({
     id,
@@ -214,15 +217,11 @@ const digestThreads = [
 const digestGroup = buildProjectParentGroups(digestThreads)[0].parentGroups.find(
   (group) => group.parentId === "digest-parent",
 );
-assert.equal(digestGroup.finishedCount, 6);
-assert.equal(digestGroup.digestItems.length, 6);
+assert.equal(digestGroup.finishedCount, 7);
+assert.equal(digestGroup.digestItems.length, 7);
 assert.deepEqual(
   digestGroup.digestItems.map((thread) => thread.id),
-  ["alpha", "zeta", "echo", "bravo", "charlie", "delta"],
-);
-assert.equal(
-  digestGroup.digestItems.map((thread) => thread.id).includes("digest-parent"),
-  false,
+  ["digest-parent", "alpha", "zeta", "echo", "bravo", "charlie", "delta"],
 );
 const activeOnlyDigestGroups = filterVisibleProjectGroups(buildProjectParentGroups(digestThreads), false);
 assert.equal(activeOnlyDigestGroups.length, 1);
@@ -231,8 +230,8 @@ assert.deepEqual(
   ["digest-parent"],
 );
 assert.deepEqual(activeOnlyDigestGroups[0].parentGroups[0].children, []);
-assert.equal(activeOnlyDigestGroups[0].parentGroups[0].finishedCount, 6);
-assert.equal(activeOnlyDigestGroups[0].parentGroups[0].digestItems.length, 6);
+assert.equal(activeOnlyDigestGroups[0].parentGroups[0].finishedCount, 7);
+assert.equal(activeOnlyDigestGroups[0].parentGroups[0].digestItems.length, 7);
 assert.deepEqual(
   activeOnlyDigestGroups[0].threads.map((thread) => thread.id),
   ["digest-parent", "zeta", "alpha", "echo", "bravo", "charlie", "delta"],
@@ -272,10 +271,46 @@ assert.deepEqual(
   ["inactive-parent"],
 );
 assert.deepEqual(inactiveDigestGroups[0].parentGroups[0].children, []);
-assert.equal(inactiveDigestGroups[0].parentGroups[0].finishedCount, 1);
+assert.equal(inactiveDigestGroups[0].parentGroups[0].finishedCount, 2);
+assert.deepEqual(
+  inactiveDigestGroups[0].parentGroups[0].digestItems.map((thread) => thread.id),
+  ["inactive-done", "inactive-parent"],
+);
 assert.deepEqual(
   inactiveDigestGroups[0].threads.map((thread) => thread.id),
   ["inactive-parent", "inactive-done"],
+);
+
+const waitingMainThreadGroups = filterVisibleProjectGroups(
+  buildProjectParentGroups([
+    {
+      id: "waiting-main",
+      title: "Waiting Main",
+      nickname: "Waiting Main",
+      role: "thread",
+      project: "codims",
+      parent_id: "waiting-main",
+      parent_title: "Waiting Main",
+      state: "RECENT",
+      updated_at_ms: 5000,
+      last_response_snippet: "Ready for review.",
+    },
+  ]),
+  false,
+);
+assert.equal(waitingMainThreadGroups.length, 1);
+assert.deepEqual(
+  waitingMainThreadGroups[0].parentGroups.map((group) => group.parentId),
+  ["waiting-main"],
+);
+assert.equal(waitingMainThreadGroups[0].parentGroups[0].finishedCount, 1);
+assert.deepEqual(
+  waitingMainThreadGroups[0].parentGroups[0].digestItems.map((thread) => thread.id),
+  ["waiting-main"],
+);
+assert.deepEqual(
+  waitingMainThreadGroups[0].threads.map((thread) => thread.id),
+  ["waiting-main"],
 );
 
 const activeOnlyGroups = filterVisibleProjectGroups(projectGroups, false);
@@ -283,7 +318,7 @@ assert.equal(activeOnlyGroups.length, 1);
 assert.equal(activeOnlyGroups[0].project, "codims");
 assert.deepEqual(
   activeOnlyGroups[0].parentGroups.map((group) => group.parentId),
-  ["parent"],
+  ["parent", "solo"],
 );
 assert.deepEqual(
   activeOnlyGroups[0].parentGroups[0].children.map((thread) => thread.id),
@@ -302,13 +337,13 @@ assert.deepEqual(
 );
 assert.deepEqual(
   activeOnlyGroups[0].parentGroups[0].digestItems.map((thread) => thread.id),
-  ["child-c", "child-d"],
+  ["child-c", "child-d", "parent"],
 );
-assert.equal(activeOnlyGroups[0].parentGroups[0].finishedCount, 2);
+assert.equal(activeOnlyGroups[0].parentGroups[0].finishedCount, 3);
 assert.equal(activeOnlyGroups[0].parentGroups[0].latestFinishedAt, 7000);
 assert.deepEqual(
   activeOnlyGroups[0].threads.map((thread) => thread.id),
-  ["parent", "child-a", "child-c", "child-d"],
+  ["parent", "child-a", "child-c", "child-d", "solo"],
 );
 
 const allGroups = filterVisibleProjectGroups(projectGroups, true);

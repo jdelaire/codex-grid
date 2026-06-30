@@ -1198,7 +1198,7 @@ function renderDigestDetails(parentGroup) {
   dom.detailAge.textContent = parentGroup.latestFinishedAt
     ? formatAge(Math.max(0, Math.floor((Date.now() - parentGroup.latestFinishedAt) / 1000)))
     : "(none)";
-  dom.detailTitle.textContent = `${parentGroup.finishedCount || 0} finished agent${
+  dom.detailTitle.textContent = `${parentGroup.finishedCount || 0} done item${
     parentGroup.finishedCount === 1 ? "" : "s"
   }`;
   dom.detailParent.textContent = privacyLabel(parentGroup.parentId || "(none)", state.privacy);
@@ -1216,7 +1216,7 @@ function renderDigestDetails(parentGroup) {
   if (!items.length) {
     const empty = document.createElement("p");
     empty.className = "digest-empty";
-    empty.textContent = "No finished agents captured.";
+    empty.textContent = "No done items captured.";
     list.appendChild(empty);
   }
 

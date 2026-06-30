@@ -307,11 +307,6 @@ function buildParentGroup(project, parentId, threads) {
   const latestThread = ordered[0];
   const children = ordered.filter((thread) => thread.id !== parentId);
   const finishedChildren = children.filter((thread) => thread.state === "DONE");
-  const latestFinishedAt = Math.max(0, ...finishedChildren.map((thread) => thread.updated_at_ms || 0));
-  const digestItems = finishedChildren
-    .slice()
-    .sort(compareDigestThreads)
-    .map(toDigestItem);
   const title =
     parentThread?.title ||
     latestThread?.parent_title ||
@@ -333,6 +328,15 @@ function buildParentGroup(project, parentId, threads) {
     intensity: isActive ? "handoff" : "idle",
     updated_at_ms: latestUpdated,
   };
+  const digestThreads = finishedChildren.slice();
+  if (parentThread && parentThread.state !== "ACTIVE") {
+    digestThreads.push(parentThread);
+  }
+  const latestFinishedAt = Math.max(0, ...digestThreads.map((thread) => thread.updated_at_ms || 0));
+  const digestItems = digestThreads
+    .slice()
+    .sort(compareDigestThreads)
+    .map(toDigestItem);
 
   return {
     key: `${project}:${parentId}`,
@@ -342,7 +346,7 @@ function buildParentGroup(project, parentId, threads) {
     lead,
     children,
     finishedChildren,
-    finishedCount: finishedChildren.length,
+    finishedCount: digestThreads.length,
     latestFinishedAt,
     digestItems,
     threads: ordered,
