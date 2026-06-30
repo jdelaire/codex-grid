@@ -704,6 +704,24 @@ function createParentAgent(parentGroup) {
   head.castShadow = true;
   group.add(head);
 
+  const shoulder = new THREE.Mesh(new THREE.BoxGeometry(1.04, 0.18, 0.42), bodyMaterial);
+  shoulder.position.y = 1.12;
+  shoulder.castShadow = true;
+  group.add(shoulder);
+
+  const visorMaterial = new THREE.MeshBasicMaterial({
+    color: 0x0f172a,
+    transparent: true,
+    opacity: 0.88,
+  });
+  const visor = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.09, 0.08), visorMaterial);
+  visor.position.set(0, 1.61, 0.32);
+  group.add(visor);
+
+  const core = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.08, 0.1), glowMaterial);
+  core.position.set(0, 0.94, 0.42);
+  group.add(core);
+
   const ring = new THREE.Mesh(new THREE.TorusGeometry(0.8, 0.03, 10, 64), glowMaterial);
   ring.rotation.x = Math.PI / 2;
   ring.position.y = 0.11;
@@ -713,7 +731,7 @@ function createParentAgent(parentGroup) {
   halo.position.y = 1.9;
   group.add(halo);
 
-  group.userData.parts = { body, head, ring, halo, bodyMaterial, glowMaterial };
+  group.userData.parts = { body, head, shoulder, visor, core, ring, halo, bodyMaterial, glowMaterial };
   scene.add(group);
   return group;
 }
@@ -750,12 +768,26 @@ function createAgent(thread) {
   head.userData.threadId = thread.id;
   group.add(head);
 
+  const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.34, 0.08, 20), bodyMaterial);
+  collar.position.y = 0.92;
+  collar.castShadow = true;
+  group.add(collar);
+
+  const statusLightMaterial = new THREE.MeshBasicMaterial({
+    color: glow.color,
+    transparent: true,
+    opacity: thread.state === "ACTIVE" ? 0.9 : 0.36,
+  });
+  const statusLight = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 8), statusLightMaterial);
+  statusLight.position.set(0, 1.42, 0.13);
+  group.add(statusLight);
+
   const ring = new THREE.Mesh(new THREE.TorusGeometry(0.47, 0.02, 8, 48), glowMaterial);
   ring.rotation.x = Math.PI / 2;
   ring.position.y = 0.09;
   group.add(ring);
 
-  group.userData.parts = { body, head, ring, glowMaterial };
+  group.userData.parts = { body, head, collar, statusLight, ring, glowMaterial, statusLightMaterial };
   scene.add(group);
   state.selectable.push(body, head);
   return group;
@@ -1216,6 +1248,7 @@ function reconcileAgents(projectGroups) {
         agent.userData.thread = thread;
         agent.userData.room = room;
         agent.userData.labelHeight = 1.72 * child.layout.scale;
+        agent.userData.layoutRing = child.layout.ring;
         agent.position.copy(worldPosition);
         agent.scale.setScalar(child.layout.scale * density);
         const parts = agent.userData.parts;
@@ -1223,6 +1256,8 @@ function reconcileAgents(projectGroups) {
         parts.body.material.color.setHex(agentBodyColor(thread, parentColorHex));
         parts.glowMaterial.color.setHex(glow.color);
         parts.glowMaterial.opacity = glow.opacity;
+        parts.statusLightMaterial.color.setHex(glow.color);
+        parts.statusLightMaterial.opacity = thread.state === "ACTIVE" ? 0.9 : Math.max(0.22, glow.opacity);
         parts.body.userData.threadId = thread.id;
         parts.body.userData.thread = thread;
         parts.body.userData.room = room;
