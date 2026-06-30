@@ -294,7 +294,7 @@ export function childVisualLayout(index, total) {
   const ringCount = Math.min(capacity, total - ringStart);
   const radius = 1.85 + ring * 0.66;
   const angle = (remaining / ringCount) * Math.PI * 2;
-  const scale = Math.max(0.58, 1 - ring * 0.1);
+  const scale = Number(Math.max(0.46, 1 - ring * 0.12).toFixed(3));
   return {
     x: Math.sin(angle) * radius,
     z: Math.cos(angle) * radius,

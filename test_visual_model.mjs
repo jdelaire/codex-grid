@@ -802,9 +802,19 @@ assert.ok(
     Math.hypot(innerRingFront.x, innerRingFront.z) + 0.45,
 );
 
-const innerAgent = childVisualLayout(0, 96);
-const outerAgent = childVisualLayout(80, 96);
-assert.ok(outerAgent.scale < innerAgent.scale);
+const crowdedAgents = Array.from({ length: 96 }, (_, index) => childVisualLayout(index, 96));
+const scaleByRing = new Map();
+for (const agent of crowdedAgents) {
+  if (!scaleByRing.has(agent.ring)) {
+    scaleByRing.set(agent.ring, agent.scale);
+  }
+}
+const highestCrowdedRing = Math.max(...scaleByRing.keys());
+assert.equal(scaleByRing.get(0), 1);
+for (let ring = 1; ring <= highestCrowdedRing; ring += 1) {
+  assert.ok(scaleByRing.get(ring) < scaleByRing.get(ring - 1));
+}
+assert.ok(scaleByRing.get(highestCrowdedRing) <= 0.52);
 
 const crowdedLayout = projectRoomLayout([
   { key: "crowded", children: Array.from({ length: 96 }) },
