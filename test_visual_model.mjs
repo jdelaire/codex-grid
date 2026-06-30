@@ -5,6 +5,7 @@ import {
   buildParentTimeline,
   buildProjectParentGroups,
   buildReviewItems,
+  filterActionInboxItems,
   childHandoffOffset,
   childVisualLayout,
   densityScale,
@@ -393,6 +394,18 @@ assert.deepEqual(
     { type: "stale", count: 1, items: ["solo"] },
     { type: "reviewed", count: 2, items: ["child-c", "solo"] },
   ],
+);
+assert.deepEqual(
+  filterActionInboxItems(actionInbox, { unreviewedOnly: true }).map(
+    (item) => `${item.type}:${item.id || item.parentId}`,
+  ),
+  ["needs_review:child-d", "needs_review:parent", "running:parent"],
+);
+assert.deepEqual(
+  filterActionInboxItems(actionInbox, { filter: "stale" }).map(
+    (item) => `${item.type}:${item.id || item.parentId}`,
+  ),
+  ["running:parent", "stale:solo"],
 );
 assert.deepEqual(
   buildActionInbox(projectGroups, reviewedThreadIds, { staleBeforeMs: 500 }).items.filter(

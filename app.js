@@ -7,6 +7,7 @@ import {
   buildProjectParentGroups,
   childVisualLayout,
   densityScale,
+  filterActionInboxItems,
   filterThreadsByMaxAge,
   filterVisibleProjectGroups,
   handoffShouldAnimate,
@@ -1111,13 +1112,10 @@ function refreshActionInbox() {
 }
 
 function visibleActionInboxItems(inbox) {
-  if (state.unreviewedOnly) {
-    return inbox.items.filter((item) => item.type === "needs_review");
-  }
-  if (state.actionInboxFilter) {
-    return inbox.items.filter((item) => item.type === state.actionInboxFilter);
-  }
-  return inbox.items;
+  return filterActionInboxItems(inbox, {
+    unreviewedOnly: state.unreviewedOnly,
+    filter: state.actionInboxFilter,
+  });
 }
 
 function actionInboxTypeLabel(type) {
@@ -1720,6 +1718,7 @@ function pickSceneAt(event) {
   raycaster.setFromCamera(pointer, camera);
   const intersects = raycaster.intersectObjects(state.selectable, false);
   if (!intersects.length) {
+    clearDetails();
     return;
   }
   const picked = intersects[0].object;
@@ -1741,7 +1740,9 @@ function pickSceneAt(event) {
   const thread = picked.userData.thread || state.threads.find((item) => item.id === threadId);
   if (thread) {
     showDetails(thread);
+    return;
   }
+  clearDetails();
 }
 
 function onPointerDown(event) {

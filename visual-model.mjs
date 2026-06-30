@@ -162,6 +162,17 @@ export function buildActionInbox(projectGroups, reviewedThreadIds = new Set(), o
   };
 }
 
+export function filterActionInboxItems(inbox, options = {}) {
+  const items = inbox?.items || [];
+  if (options.unreviewedOnly) {
+    return items.filter((item) => item.type === "needs_review" || item.type === "running");
+  }
+  if (options.filter) {
+    return items.filter((item) => item.type === options.filter || item.type === "running");
+  }
+  return items;
+}
+
 export function staleInboxCutoffMs(nowMs = Date.now()) {
   return nowMs - STALE_AFTER_MS;
 }
