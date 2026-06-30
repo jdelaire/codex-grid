@@ -226,8 +226,21 @@ export function buildParentTimeline(parentGroup, reviewedThreadIds = new Set()) 
     parentTitle: parentGroup.title,
     reviewed: reviewedThreadIds.has(item.id),
   }));
+  const fallbackLeadItems =
+    parentGroup?.lead && !activeLeadItems.length && !activeItems.length && !finishedItems.length
+      ? [
+          {
+            ...parentGroup.lead,
+            type: "idle",
+            parentId: parentGroup.parentId,
+            parentKey: parentGroup.key,
+            parentTitle: parentGroup.title,
+            reviewed: false,
+          },
+        ]
+      : [];
 
-  return [...activeLeadItems, ...activeItems, ...finishedItems]
+  return [...activeLeadItems, ...activeItems, ...finishedItems, ...fallbackLeadItems]
     .map((item, index) => ({ item, index }))
     .sort((left, right) => {
       const updatedDelta = (right.item.updated_at_ms || 0) - (left.item.updated_at_ms || 0);

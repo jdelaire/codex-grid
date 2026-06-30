@@ -1462,6 +1462,26 @@ function digestDetailThread(item) {
   };
 }
 
+function timelineItemStateLabel(item) {
+  if (item.type === "active") {
+    return "Running";
+  }
+  if (item.type === "idle") {
+    return "Idle";
+  }
+  return "Finished";
+}
+
+function timelineItemStatusLabel(item) {
+  if (item.type === "active") {
+    return "Running";
+  }
+  if (item.type === "idle") {
+    return "Idle";
+  }
+  return item.reviewed ? "Reviewed" : "Needs review";
+}
+
 function renderParentTimeline(parentGroup) {
   const items = buildParentTimeline(parentGroup, state.reviewedThreadIds);
   const list = document.createElement("div");
@@ -1493,7 +1513,7 @@ function renderParentTimeline(parentGroup) {
     meta.className = "timeline-item-meta";
     meta.textContent = state.privacy
       ? "Hidden"
-      : `${item.type === "active" ? "Running" : "Finished"} / ${
+      : `${timelineItemStateLabel(item)} / ${
           item.nickname || item.project || "thread"
         } / ${formatAge(actionInboxItemAgeSeconds(item))}`;
 
@@ -1509,8 +1529,7 @@ function renderParentTimeline(parentGroup) {
 
     const status = document.createElement("span");
     status.className = "timeline-status";
-    status.textContent =
-      item.type === "active" ? "Running" : item.reviewed ? "Reviewed" : "Needs review";
+    status.textContent = timelineItemStatusLabel(item);
 
     row.replaceChildren(openButton, status);
     list.appendChild(row);

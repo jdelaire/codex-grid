@@ -318,6 +318,28 @@ assert.deepEqual(
   })),
   [{ id: "solo-active", type: "active", reviewed: false }],
 );
+const staleIdleGroup = buildProjectParentGroups([
+  {
+    id: "idle-child",
+    title: "Idle child",
+    nickname: "Idle child",
+    project: "codims",
+    parent_id: "stale-parent",
+    parent_title: "Stale parent",
+    state: "RECENT",
+    intensity: "idle",
+    updated_at_ms: 8500,
+  },
+])[0].parentGroups[0];
+assert.equal(staleIdleGroup.digestItems.length, 0);
+assert.deepEqual(
+  buildParentTimeline(staleIdleGroup, new Set()).map((item) => ({
+    id: item.id,
+    type: item.type,
+    reviewed: item.reviewed,
+  })),
+  [{ id: "stale-parent", type: "idle", reviewed: false }],
+);
 
 const actionInbox = buildActionInbox(projectGroups, reviewedThreadIds, { staleBeforeMs: 8000 });
 assert.deepEqual(actionInbox.counts, {
