@@ -38,6 +38,9 @@ export function filterVisibleProjectGroups(projectGroups, showInactive) {
         for (const child of parentGroup.children) {
           threadMap.set(child.id, child);
         }
+        for (const child of parentGroup.finishedChildren) {
+          threadMap.set(child.id, child);
+        }
       }
       const threads = [...threadMap.values()];
       return {

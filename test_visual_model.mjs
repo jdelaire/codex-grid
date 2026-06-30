@@ -197,7 +197,47 @@ assert.equal(activeOnlyDigestGroups[0].parentGroups[0].finishedCount, 6);
 assert.equal(activeOnlyDigestGroups[0].parentGroups[0].digestItems.length, 6);
 assert.deepEqual(
   activeOnlyDigestGroups[0].threads.map((thread) => thread.id),
-  ["digest-parent"],
+  ["digest-parent", "zeta", "alpha", "echo", "bravo", "charlie", "delta"],
+);
+
+const inactiveParentDigestThreads = [
+  {
+    id: "inactive-parent",
+    title: "Inactive Parent",
+    nickname: "Inactive Parent",
+    project: "codims",
+    parent_id: "inactive-parent",
+    parent_title: "Inactive Parent",
+    state: "RECENT",
+    updated_at_ms: 2000,
+  },
+  {
+    id: "inactive-done",
+    title: "Inactive Done",
+    nickname: "Inactive Done",
+    role: "agent",
+    project: "codims",
+    parent_id: "inactive-parent",
+    parent_title: "Inactive Parent",
+    state: "DONE",
+    updated_at_ms: 3000,
+    last_response_snippet: "Finished while parent was inactive.",
+  },
+];
+const inactiveDigestGroups = filterVisibleProjectGroups(
+  buildProjectParentGroups(inactiveParentDigestThreads),
+  false,
+);
+assert.equal(inactiveDigestGroups.length, 1);
+assert.deepEqual(
+  inactiveDigestGroups[0].parentGroups.map((group) => group.parentId),
+  ["inactive-parent"],
+);
+assert.deepEqual(inactiveDigestGroups[0].parentGroups[0].children, []);
+assert.equal(inactiveDigestGroups[0].parentGroups[0].finishedCount, 1);
+assert.deepEqual(
+  inactiveDigestGroups[0].threads.map((thread) => thread.id),
+  ["inactive-parent", "inactive-done"],
 );
 
 const activeOnlyGroups = filterVisibleProjectGroups(projectGroups, false);
@@ -230,7 +270,7 @@ assert.equal(activeOnlyGroups[0].parentGroups[0].finishedCount, 2);
 assert.equal(activeOnlyGroups[0].parentGroups[0].latestFinishedAt, 7000);
 assert.deepEqual(
   activeOnlyGroups[0].threads.map((thread) => thread.id),
-  ["parent", "child-a"],
+  ["parent", "child-a", "child-c", "child-d"],
 );
 
 const allGroups = filterVisibleProjectGroups(projectGroups, true);
