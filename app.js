@@ -20,6 +20,7 @@ import {
   roomCameraFocus,
   serializeReviewedThreadIds,
   shouldPollThreads,
+  staleInboxCutoffMs,
   threadActivityLabel,
 } from "./visual-model.mjs";
 
@@ -1069,11 +1070,7 @@ function updateCounters(projectGroups) {
 }
 
 function currentStaleBeforeMs() {
-  const maxAgeHours = Number(dom.maxAgeHours.value || "0");
-  if (!Number.isFinite(maxAgeHours) || maxAgeHours <= 0) {
-    return undefined;
-  }
-  return Date.now() - maxAgeHours * 60 * 60 * 1000;
+  return staleInboxCutoffMs(Date.now());
 }
 
 function refreshActionInbox() {

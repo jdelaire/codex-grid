@@ -24,6 +24,8 @@ import {
   reviewStateForParentGroup,
   roomCameraFocus,
   shouldPollThreads,
+  STALE_AFTER_MS,
+  staleInboxCutoffMs,
   threadActivityLabel,
 } from "./visual-model.mjs";
 
@@ -344,6 +346,38 @@ assert.deepEqual(
     (item) => item.type === "stale",
   ),
   [],
+);
+assert.equal(STALE_AFTER_MS, 30 * 60 * 1000);
+const staleNowMs = 100 * 60 * 1000;
+const recentlyFetchedStaleGroups = buildProjectParentGroups([
+  {
+    id: "recent-stale",
+    title: "Recently fetched stale",
+    nickname: "Recently fetched stale",
+    project: "codims",
+    parent_id: "recent-stale",
+    parent_title: "Recently fetched stale",
+    state: "RECENT",
+    updated_at_ms: staleNowMs - 45 * 60 * 1000,
+  },
+  {
+    id: "recent-fresh",
+    title: "Recently fetched fresh",
+    nickname: "Recently fetched fresh",
+    project: "codims",
+    parent_id: "recent-fresh",
+    parent_title: "Recently fetched fresh",
+    state: "RECENT",
+    updated_at_ms: staleNowMs - 10 * 60 * 1000,
+  },
+]);
+assert.deepEqual(
+  buildActionInbox(recentlyFetchedStaleGroups, new Set(), {
+    staleBeforeMs: staleInboxCutoffMs(staleNowMs),
+  })
+    .items.filter((item) => item.type === "stale")
+    .map((item) => item.parentId),
+  ["recent-stale"],
 );
 
 const digestThreads = [

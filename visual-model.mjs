@@ -1,3 +1,5 @@
+export const STALE_AFTER_MS = 30 * 60 * 1000;
+
 export function buildProjectParentGroups(threads) {
   const projects = new Map();
   for (const thread of threads) {
@@ -148,6 +150,10 @@ export function buildActionInbox(projectGroups, reviewedThreadIds = new Set(), o
       reviewed: reviewActionItems.filter((item) => item.type === "reviewed").length,
     },
   };
+}
+
+export function staleInboxCutoffMs(nowMs = Date.now()) {
+  return nowMs - STALE_AFTER_MS;
 }
 
 export function buildParentTimeline(parentGroup, reviewedThreadIds = new Set()) {
