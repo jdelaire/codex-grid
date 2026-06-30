@@ -129,7 +129,8 @@ h1::before {
   font-size: 12px;
 }
 
-.controls input {
+.controls input,
+.controls select {
   width: 58px;
   border: 1px solid var(--line);
   border-radius: 5px;
@@ -138,6 +139,10 @@ h1::before {
   padding: 7px 8px;
   font: inherit;
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+}
+
+.controls select {
+  width: 94px;
 }
 
 .search-control input {
@@ -163,6 +168,7 @@ h1::before {
 }
 
 .controls input:focus-visible,
+.controls select:focus-visible,
 .controls button:focus-visible {
   outline: 2px solid rgba(34, 211, 238, 0.45);
   outline-offset: 2px;
@@ -521,9 +527,15 @@ dd {
     font-size: 11px;
   }
 
-  .controls input {
+  .controls input,
+  .controls select {
     width: 52px;
     padding: 6px 7px;
+  }
+
+  .controls select {
+    grid-column: 2 / -1;
+    width: 100%;
   }
 
   .controls button {

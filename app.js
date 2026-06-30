@@ -28,6 +28,7 @@ const dom = {
   controls: document.querySelector("#controls"),
   activeMinutes: document.querySelector("#activeMinutes"),
   maxAgeHours: document.querySelector("#maxAgeHours"),
+  densityMode: document.querySelector("#densityMode"),
   threadSearch: document.querySelector("#threadSearch"),
   liveToggle: document.querySelector("#liveToggle"),
   labelsToggle: document.querySelector("#labelsToggle"),
@@ -1376,6 +1377,11 @@ function bindEvents() {
     savePreferences();
     refreshThreads();
   });
+  dom.densityMode.addEventListener("change", () => {
+    state.density = dom.densityMode.value === "compact" ? "compact" : "normal";
+    savePreferences();
+    refreshThreads();
+  });
   dom.threadSearch.addEventListener("input", () => {
     state.search = dom.threadSearch.value;
     refreshThreads();
@@ -1403,6 +1409,7 @@ const prefs = loadPreferences();
 dom.activeMinutes.value = prefs.activeMinutes;
 dom.maxAgeHours.value = prefs.maxAgeHours;
 state.density = prefs.density;
+dom.densityMode.value = prefs.density;
 setLabels(prefs.labels);
 setShowInactive(prefs.showInactive, { refresh: false });
 setPrivacy(prefs.privacy, { refresh: false });
