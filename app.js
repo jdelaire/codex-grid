@@ -1,11 +1,13 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import {
+  actionInboxFetchMaxAgeHours,
   buildActionInbox,
   buildParentTimeline,
   buildProjectParentGroups,
   childVisualLayout,
   densityScale,
+  filterThreadsByMaxAge,
   filterVisibleProjectGroups,
   handoffShouldAnimate,
   matchesThreadSearch,
@@ -128,6 +130,7 @@ const state = {
   reviewedThreadIds: loadReviewedThreadIds(),
   reviewItems: [],
   projectGroups: [],
+  actionInboxProjectGroups: [],
   selectedMode: null,
   selectedDigest: null,
   selectedParentKey: null,
@@ -1074,7 +1077,7 @@ function currentStaleBeforeMs() {
 }
 
 function refreshActionInbox() {
-  state.actionInbox = buildActionInbox(state.projectGroups, state.reviewedThreadIds, {
+  state.actionInbox = buildActionInbox(state.actionInboxProjectGroups, state.reviewedThreadIds, {
     staleBeforeMs: currentStaleBeforeMs(),
   });
   state.reviewItems = state.actionInbox.reviewItems;
@@ -1226,7 +1229,7 @@ function updateStatus(payload) {
 
 async function fetchThreads() {
   const params = new URLSearchParams({
-    maxAgeHours: dom.maxAgeHours.value || "8",
+    maxAgeHours: actionInboxFetchMaxAgeHours(dom.maxAgeHours.value || "8"),
   });
   const response = await fetch(`/api/threads?${params.toString()}`, { cache: "no-store" });
   if (!response.ok) {
@@ -1256,7 +1259,7 @@ async function sendThreadMessage(threadId, message, role) {
 }
 
 function visibleParentGroups() {
-  return state.projectGroups.flatMap((projectGroup) => projectGroup.parentGroups || []);
+  return state.actionInboxProjectGroups.flatMap((projectGroup) => projectGroup.parentGroups || []);
 }
 
 function findParentGroupByKey(parentKey) {
@@ -1296,8 +1299,14 @@ async function refreshThreads() {
     if (seq !== state.refreshSeq) {
       return;
     }
-    const visibleThreads = payload.threads.filter((thread) => matchesThreadSearch(thread, state.search));
-    state.threads = visibleThreads;
+    const searchedThreads = payload.threads.filter((thread) => matchesThreadSearch(thread, state.search));
+    const visibleThreads = filterThreadsByMaxAge(
+      searchedThreads,
+      payload.generated_at_ms,
+      dom.maxAgeHours.value || "8",
+    );
+    state.threads = searchedThreads;
+    state.actionInboxProjectGroups = buildProjectParentGroups(searchedThreads);
     const allProjectGroups = buildProjectParentGroups(visibleThreads);
     const projectGroups = filterVisibleProjectGroups(allProjectGroups, state.showInactive);
     state.projectGroups = projectGroups;

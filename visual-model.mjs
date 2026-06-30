@@ -1,4 +1,5 @@
 export const STALE_AFTER_MS = 30 * 60 * 1000;
+export const STALE_INBOX_FETCH_HOURS = 24;
 
 export function buildProjectParentGroups(threads) {
   const projects = new Map();
@@ -154,6 +155,29 @@ export function buildActionInbox(projectGroups, reviewedThreadIds = new Set(), o
 
 export function staleInboxCutoffMs(nowMs = Date.now()) {
   return nowMs - STALE_AFTER_MS;
+}
+
+export function actionInboxFetchMaxAgeHours(maxAgeHours) {
+  const parsed = Number(maxAgeHours);
+  if (parsed === 0) {
+    return "0";
+  }
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return String(STALE_INBOX_FETCH_HOURS);
+  }
+  return String(Math.max(parsed, STALE_INBOX_FETCH_HOURS));
+}
+
+export function filterThreadsByMaxAge(threads, generatedAtMs, maxAgeHours) {
+  const parsed = Number(maxAgeHours);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return threads;
+  }
+  const cutoffMs = Number(generatedAtMs) - parsed * 60 * 60 * 1000;
+  if (!Number.isFinite(cutoffMs)) {
+    return threads;
+  }
+  return threads.filter((thread) => (thread.updated_at_ms || 0) >= cutoffMs);
 }
 
 export function buildParentTimeline(parentGroup, reviewedThreadIds = new Set()) {

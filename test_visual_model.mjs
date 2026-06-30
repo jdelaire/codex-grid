@@ -8,6 +8,8 @@ import {
   childHandoffOffset,
   childVisualLayout,
   densityScale,
+  actionInboxFetchMaxAgeHours,
+  filterThreadsByMaxAge,
   filterReviewItems,
   filterVisibleProjectGroups,
   handoffShouldAnimate,
@@ -25,6 +27,7 @@ import {
   roomCameraFocus,
   shouldPollThreads,
   STALE_AFTER_MS,
+  STALE_INBOX_FETCH_HOURS,
   staleInboxCutoffMs,
   threadActivityLabel,
 } from "./visual-model.mjs";
@@ -378,6 +381,50 @@ assert.deepEqual(
     .items.filter((item) => item.type === "stale")
     .map((item) => item.parentId),
   ["recent-stale"],
+);
+assert.equal(STALE_INBOX_FETCH_HOURS, 24);
+assert.equal(actionInboxFetchMaxAgeHours("1"), "24");
+assert.equal(actionInboxFetchMaxAgeHours("24"), "24");
+assert.equal(actionInboxFetchMaxAgeHours("48"), "48");
+assert.equal(actionInboxFetchMaxAgeHours("0"), "0");
+const sceneMaxAgeNowMs = 4 * 60 * 60 * 1000;
+const fetchedForSceneAndInbox = [
+  {
+    id: "scene-fresh",
+    title: "Scene Fresh",
+    nickname: "Scene Fresh",
+    project: "codims",
+    parent_id: "scene-fresh",
+    parent_title: "Scene Fresh",
+    state: "RECENT",
+    updated_at_ms: sceneMaxAgeNowMs - 20 * 60 * 1000,
+  },
+  {
+    id: "inbox-stale",
+    title: "Inbox Stale",
+    nickname: "Inbox Stale",
+    project: "codims",
+    parent_id: "inbox-stale",
+    parent_title: "Inbox Stale",
+    state: "RECENT",
+    updated_at_ms: sceneMaxAgeNowMs - 2 * 60 * 60 * 1000,
+  },
+];
+assert.deepEqual(
+  filterThreadsByMaxAge(fetchedForSceneAndInbox, sceneMaxAgeNowMs, "1").map((thread) => thread.id),
+  ["scene-fresh"],
+);
+assert.deepEqual(
+  filterThreadsByMaxAge(fetchedForSceneAndInbox, sceneMaxAgeNowMs, "0").map((thread) => thread.id),
+  ["scene-fresh", "inbox-stale"],
+);
+assert.deepEqual(
+  buildActionInbox(buildProjectParentGroups(fetchedForSceneAndInbox), new Set(), {
+    staleBeforeMs: staleInboxCutoffMs(sceneMaxAgeNowMs),
+  })
+    .items.filter((item) => item.type === "stale")
+    .map((item) => item.parentId),
+  ["inbox-stale"],
 );
 
 const digestThreads = [
