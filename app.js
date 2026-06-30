@@ -1276,6 +1276,7 @@ function reconcileAgents(projectGroups) {
         label.dataset.threadId = thread.id;
         label.dataset.parentId = thread.parent_id || thread.id;
         label.dataset.roomIndex = String(index);
+        label.dataset.layoutRing = String(child.layout.ring);
         const agentBorderColor = agentLabelBorderColor(thread, parentCssColor);
         label.dataset.borderColor = agentBorderColor;
         label.style.borderColor = agentBorderColor;
@@ -1314,11 +1315,14 @@ function updateAgentLabelVisibility() {
     const agent = state.agents.get(threadId);
     const thread = agent?.userData.thread;
     const roomIndex = Number(label.dataset.roomIndex || "0");
+    const layoutRing = Number(label.dataset.layoutRing || "0");
+    const selected = threadId === state.selectedId;
+    const running = thread?.state === "ACTIVE";
     label.hidden = Boolean(
       dense &&
-        thread?.state !== "ACTIVE" &&
-        threadId !== state.selectedId &&
-        roomIndex >= 8,
+        !running &&
+        !selected &&
+        (layoutRing >= 2 || roomIndex >= 8),
     );
   }
 }
@@ -2136,6 +2140,7 @@ function animateAgents(elapsed) {
     parentAgent.position.y = Math.sin(elapsed * speed + hashString(parentGroup?.parentId || "")) * (parentGroup?.isActive ? 0.05 : 0.008);
     parts.head.rotation.z = Math.sin(elapsed * speed) * (parentGroup?.isActive ? 0.04 : 0.01);
     parts.ring.scale.setScalar(1 + Math.sin(elapsed * speed) * (parentGroup?.isActive ? 0.08 : 0.012));
+    parts.core.scale.setScalar(1 + Math.sin(elapsed * speed * 1.2) * (parentGroup?.isActive ? 0.12 : 0.02));
     parts.halo.rotation.z = elapsed * (parentGroup?.isActive ? 0.7 : 0.18);
   }
 
@@ -2163,14 +2168,17 @@ function animateAgents(elapsed) {
       agent.position.y = Math.sin(elapsed * speed + hashString(thread.id)) * 0.08;
       parts.head.rotation.z = pulse;
       parts.ring.scale.setScalar(selected ? Math.max(1.12, ringScale) : ringScale);
+      parts.statusLight.scale.setScalar(1.1 + Math.abs(pulse) * 2.2);
     } else if (thread.state === "DONE") {
       agent.position.y = 0;
       parts.head.rotation.z = 0;
       parts.ring.scale.setScalar(selected ? 1.12 : 1);
+      parts.statusLight.scale.setScalar(selected ? 1.08 : 0.92);
     } else {
       agent.position.y = Math.sin(elapsed * 1.2 + hashString(thread.id)) * 0.008;
       parts.head.rotation.z = Math.sin(elapsed * 0.8) * 0.012;
       parts.ring.scale.setScalar(selected ? 1.12 : 1);
+      parts.statusLight.scale.setScalar(selected ? 1.08 : 1);
     }
   }
 
