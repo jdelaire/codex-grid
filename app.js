@@ -105,6 +105,8 @@ controls.target.set(0, 0, 0);
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 const clock = new THREE.Clock();
+const CLICK_MOVE_LIMIT_PX = 6;
+let pendingPointerPick = null;
 
 const ambient = new THREE.HemisphereLight(0xcfe7ff, 0x1d1228, 2.45);
 scene.add(ambient);
@@ -1256,7 +1258,7 @@ function updateCameraFocus(nowMs) {
   }
 }
 
-function onPointerDown(event) {
+function pickSceneAt(event) {
   const rect = renderer.domElement.getBoundingClientRect();
   pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
   pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
@@ -1280,6 +1282,35 @@ function onPointerDown(event) {
   if (thread) {
     showDetails(thread);
   }
+}
+
+function onPointerDown(event) {
+  if (event.button !== 0) {
+    pendingPointerPick = null;
+    return;
+  }
+  pendingPointerPick = {
+    pointerId: event.pointerId,
+    x: event.clientX,
+    y: event.clientY,
+  };
+}
+
+function onPointerUp(event) {
+  if (!pendingPointerPick || pendingPointerPick.pointerId !== event.pointerId) {
+    pendingPointerPick = null;
+    return;
+  }
+  const distance = Math.hypot(event.clientX - pendingPointerPick.x, event.clientY - pendingPointerPick.y);
+  pendingPointerPick = null;
+  if (distance > CLICK_MOVE_LIMIT_PX) {
+    return;
+  }
+  pickSceneAt(event);
+}
+
+function onPointerCancel() {
+  pendingPointerPick = null;
 }
 
 function updateLabels() {
@@ -1455,6 +1486,8 @@ async function onThreadMessageSubmit(event) {
 function bindEvents() {
   window.addEventListener("resize", resize);
   renderer.domElement.addEventListener("pointerdown", onPointerDown);
+  renderer.domElement.addEventListener("pointerup", onPointerUp);
+  renderer.domElement.addEventListener("pointercancel", onPointerCancel);
   dom.controls.addEventListener("submit", (event) => {
     event.preventDefault();
     refreshThreads();
