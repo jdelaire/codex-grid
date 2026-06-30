@@ -1118,6 +1118,19 @@ function actionInboxItemAgeSeconds(item) {
   return 0;
 }
 
+function actionInboxItemActorLabel(item) {
+  return item.nickname || item.parentTitle || item.title || "thread";
+}
+
+function actionInboxItemMetaText(label, item) {
+  if (state.privacy) {
+    return "Hidden";
+  }
+  return `${label} / ${item.project || "unknown"} / ${actionInboxItemActorLabel(item)} / ${formatAge(
+    actionInboxItemAgeSeconds(item),
+  )}`;
+}
+
 function actionInboxEmptyText() {
   if (state.unreviewedOnly) {
     return "No items need review.";
@@ -1170,11 +1183,7 @@ function renderReviewLane() {
 
     const meta = document.createElement("span");
     meta.className = "review-item-meta";
-    meta.textContent = state.privacy
-      ? "Hidden"
-      : `${actionInboxTypeLabel(item.type)} / ${item.nickname || item.project || "thread"} / ${formatAge(
-          actionInboxItemAgeSeconds(item),
-        )}`;
+    meta.textContent = actionInboxItemMetaText(actionInboxTypeLabel(item.type), item);
 
     const title = document.createElement("span");
     title.className = "review-item-title";
@@ -1511,11 +1520,7 @@ function renderParentTimeline(parentGroup) {
 
     const meta = document.createElement("span");
     meta.className = "timeline-item-meta";
-    meta.textContent = state.privacy
-      ? "Hidden"
-      : `${timelineItemStateLabel(item)} / ${
-          item.nickname || item.project || "thread"
-        } / ${formatAge(actionInboxItemAgeSeconds(item))}`;
+    meta.textContent = actionInboxItemMetaText(timelineItemStateLabel(item), item);
 
     const title = document.createElement("span");
     title.className = "timeline-item-title";
