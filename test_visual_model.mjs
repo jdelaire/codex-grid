@@ -6,7 +6,6 @@ import {
   childVisualLayout,
   filterVisibleProjectGroups,
   handoffShouldAnimate,
-  MAX_DIGEST_ITEMS,
   parentGroupOffset,
   projectRoomLayout,
   projectRoomGridSpacing,
@@ -178,14 +177,27 @@ const digestGroup = buildProjectParentGroups(digestThreads)[0].parentGroups.find
   (group) => group.parentId === "digest-parent",
 );
 assert.equal(digestGroup.finishedCount, 6);
-assert.equal(digestGroup.digestItems.length, MAX_DIGEST_ITEMS);
+assert.equal(digestGroup.digestItems.length, 6);
 assert.deepEqual(
   digestGroup.digestItems.map((thread) => thread.id),
-  ["alpha", "zeta", "echo", "bravo", "charlie"],
+  ["alpha", "zeta", "echo", "bravo", "charlie", "delta"],
 );
 assert.equal(
   digestGroup.digestItems.map((thread) => thread.id).includes("digest-parent"),
   false,
+);
+const activeOnlyDigestGroups = filterVisibleProjectGroups(buildProjectParentGroups(digestThreads), false);
+assert.equal(activeOnlyDigestGroups.length, 1);
+assert.deepEqual(
+  activeOnlyDigestGroups[0].parentGroups.map((group) => group.parentId),
+  ["digest-parent"],
+);
+assert.deepEqual(activeOnlyDigestGroups[0].parentGroups[0].children, []);
+assert.equal(activeOnlyDigestGroups[0].parentGroups[0].finishedCount, 6);
+assert.equal(activeOnlyDigestGroups[0].parentGroups[0].digestItems.length, 6);
+assert.deepEqual(
+  activeOnlyDigestGroups[0].threads.map((thread) => thread.id),
+  ["digest-parent"],
 );
 
 const activeOnlyGroups = filterVisibleProjectGroups(projectGroups, false);

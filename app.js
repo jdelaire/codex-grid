@@ -759,9 +759,7 @@ function reconcileAgents(projectGroups) {
   );
   const activeDigestKeys = new Set(
     projectGroups.flatMap((projectGroup) =>
-      projectGroup.parentGroups
-        .filter((parentGroup) => parentGroup.finishedCount > 0)
-        .map((parentGroup) => parentGroup.key),
+      projectGroup.parentGroups.map((parentGroup) => parentGroup.key),
     ),
   );
   const childThreads = projectGroups.flatMap((projectGroup) =>
@@ -850,20 +848,19 @@ function reconcileAgents(projectGroups) {
       parentLabel.style.borderColor = parentCssColor;
       parentLabel.style.boxShadow = parentGroup.isActive ? `0 0 24px ${parentCssColor}88` : "";
 
-      if (parentGroup.finishedCount > 0) {
-        let digestObject = state.digestObjects.get(parentGroup.key);
-        if (!digestObject) {
-          digestObject = createDigestObject(parentGroup);
-          state.digestObjects.set(parentGroup.key, digestObject);
-          state.digestLabels.set(parentGroup.key, createLabel("digest-label"));
-        }
-        digestObject.position.copy(digestPosition(parentPosition, parentGroup));
-        updateDigestPickables(digestObject, parentGroup, room);
-
-        const digestLabel = state.digestLabels.get(parentGroup.key);
-        digestLabel.textContent = `${parentGroup.finishedCount} done`;
-        digestLabel.dataset.digestKey = parentGroup.key;
+      let digestObject = state.digestObjects.get(parentGroup.key);
+      if (!digestObject) {
+        digestObject = createDigestObject(parentGroup);
+        state.digestObjects.set(parentGroup.key, digestObject);
+        state.digestLabels.set(parentGroup.key, createLabel("digest-label"));
       }
+      digestObject.position.copy(digestPosition(parentPosition, parentGroup));
+      updateDigestPickables(digestObject, parentGroup, room);
+
+      const digestLabel = state.digestLabels.get(parentGroup.key);
+      digestLabel.textContent = `${parentGroup.finishedCount || 0} done`;
+      digestLabel.dataset.digestKey = parentGroup.key;
+      digestLabel.classList.toggle("is-empty", !parentGroup.finishedCount);
 
       for (const [index, thread] of parentGroup.children.entries()) {
         const child = childPosition(parentPositions.get(parentGroup.key), index, parentGroup.children.length);
@@ -1016,7 +1013,7 @@ async function refreshThreads() {
     if (state.selectedMode === "digest" && state.selectedDigest?.key) {
       const selectedDigest = projectGroups
         .flatMap((projectGroup) => projectGroup.parentGroups)
-        .find((parentGroup) => parentGroup.key === state.selectedDigest.key && parentGroup.finishedCount > 0);
+        .find((parentGroup) => parentGroup.key === state.selectedDigest.key);
       if (selectedDigest) {
         renderDigestDetails(selectedDigest);
       } else {

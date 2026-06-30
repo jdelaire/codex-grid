@@ -1,5 +1,3 @@
-export const MAX_DIGEST_ITEMS = 5;
-
 export function buildProjectParentGroups(threads) {
   const projects = new Map();
   for (const thread of threads) {
@@ -29,7 +27,7 @@ export function filterVisibleProjectGroups(projectGroups, showInactive) {
   return projectGroups
     .map((projectGroup) => {
       const parentGroups = projectGroup.parentGroups
-        .filter((parentGroup) => parentGroup.isActive)
+        .filter((parentGroup) => parentGroup.isActive || parentGroup.finishedCount > 0)
         .map((parentGroup) => ({
           ...parentGroup,
           children: parentGroup.children.filter((thread) => thread.state === "ACTIVE"),
@@ -244,7 +242,6 @@ function buildParentGroup(project, parentId, threads) {
   const digestItems = finishedChildren
     .slice()
     .sort(compareDigestThreads)
-    .slice(0, MAX_DIGEST_ITEMS)
     .map(toDigestItem);
   const title =
     parentThread?.title ||

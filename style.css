@@ -275,6 +275,12 @@ h1::before {
   box-shadow: 0 0 18px rgba(245, 158, 11, 0.22), 0 10px 26px rgba(0, 0, 0, 0.32);
 }
 
+.digest-label.is-empty {
+  color: #d6c5a2;
+  border-color: rgba(245, 158, 11, 0.34);
+  opacity: 0.82;
+}
+
 .parent-label.is-active {
   color: #d1fae5;
   border-color: rgba(52, 211, 153, 0.78);
