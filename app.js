@@ -704,20 +704,20 @@ function createLabel(className) {
 
 function agentGlowForState(thread) {
   if (thread.state === "ACTIVE") {
-    return { color: gridStudio.active, opacity: 0.5 };
+    return { color: gridStudio.active, opacity: 0.62 };
   }
   if (thread.state === "DONE") {
-    return { color: gridStudio.done, opacity: 0.18 };
+    return { color: gridStudio.done, opacity: 0.28 };
   }
-  return { color: 0x475569, opacity: 0.08 };
+  return { color: 0x35525e, opacity: 0.12 };
 }
 
 function agentBodyColor(thread, parentColorHex) {
-  return thread.state === "DONE" ? 0x92400e : parentColorHex;
+  return thread.state === "DONE" ? 0x3b2108 : parentColorHex;
 }
 
 function agentLabelBorderColor(thread, parentCssColor) {
-  return thread.state === "DONE" ? "rgba(245, 158, 11, 0.58)" : parentCssColor;
+  return thread.state === "DONE" ? "rgba(255, 138, 0, 0.68)" : parentCssColor;
 }
 
 function createParentAgent(parentGroup) {
@@ -726,62 +726,70 @@ function createParentAgent(parentGroup) {
 
   const color = parentGroupColor(parentGroup);
   const bodyMaterial = new THREE.MeshStandardMaterial({
-    color,
-    roughness: 0.48,
-    metalness: 0.12,
-    emissive: 0x000000,
+    color: 0x07111b,
+    roughness: 0.36,
+    metalness: 0.34,
+    emissive: color,
+    emissiveIntensity: parentGroup.isActive ? 0.12 : 0.035,
   });
   const headMaterial = new THREE.MeshStandardMaterial({
-    color: 0xf8fafc,
-    roughness: 0.5,
-    metalness: 0.02,
-    emissive: 0x9cc8ee,
-    emissiveIntensity: 0.025,
+    color: 0x08131d,
+    roughness: 0.34,
+    metalness: 0.28,
+    emissive: gridStudio.cyan,
+    emissiveIntensity: 0.045,
   });
   const glowMaterial = new THREE.MeshBasicMaterial({
     color: parentGroup.isActive ? gridStudio.active : color,
     transparent: true,
-    opacity: parentGroup.isActive ? 0.56 : 0.16,
+    opacity: parentGroup.isActive ? 0.62 : 0.2,
+    blending: THREE.AdditiveBlending,
   });
 
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.5, 1.18, 32), bodyMaterial);
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.46, 1.32, 6), bodyMaterial);
   body.position.y = 0.78;
   body.castShadow = true;
   group.add(body);
 
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.38, 28, 20), headMaterial);
-  head.position.y = 1.58;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.34, 18, 14), headMaterial);
+  head.scale.set(0.86, 1, 0.78);
+  head.position.y = 1.62;
   head.castShadow = true;
   group.add(head);
 
-  const shoulder = new THREE.Mesh(new THREE.BoxGeometry(1.04, 0.18, 0.42), bodyMaterial);
-  shoulder.position.y = 1.12;
+  const shoulder = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.14, 0.36), bodyMaterial);
+  shoulder.position.y = 1.16;
   shoulder.castShadow = true;
   group.add(shoulder);
 
   const visorMaterial = new THREE.MeshBasicMaterial({
-    color: 0x0f172a,
+    color: gridStudio.cyan,
     transparent: true,
-    opacity: 0.88,
+    opacity: 0.92,
+    blending: THREE.AdditiveBlending,
   });
-  const visor = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.09, 0.08), visorMaterial);
-  visor.position.set(0, 1.61, 0.32);
+  const visor = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.055, 0.065), visorMaterial);
+  visor.position.set(0, 1.64, 0.27);
   group.add(visor);
 
-  const core = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.08, 0.1), glowMaterial);
-  core.position.set(0, 0.94, 0.42);
+  const core = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.62, 0.08), glowMaterial);
+  core.position.set(0, 0.86, 0.38);
   group.add(core);
 
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.8, 0.03, 10, 64), glowMaterial);
+  const belt = new THREE.Mesh(new THREE.BoxGeometry(0.64, 0.055, 0.08), glowMaterial);
+  belt.position.set(0, 0.64, 0.39);
+  group.add(belt);
+
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.022, 8, 64), glowMaterial);
   ring.rotation.x = Math.PI / 2;
-  ring.position.y = 0.11;
+  ring.position.y = 0.09;
   group.add(ring);
 
-  const halo = new THREE.Mesh(new THREE.TorusGeometry(0.56, 0.022, 8, 52), glowMaterial);
-  halo.position.y = 1.9;
-  group.add(halo);
+  const disc = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.026, 8, 56), glowMaterial);
+  disc.position.set(0, 1.12, -0.29);
+  group.add(disc);
 
-  group.userData.parts = { body, head, shoulder, visor, core, ring, halo, bodyMaterial, glowMaterial };
+  group.userData.parts = { body, head, shoulder, visor, core, belt, ring, disc, bodyMaterial, glowMaterial };
   scene.add(group);
   return group;
 }
@@ -792,52 +800,65 @@ function createAgent(thread) {
 
   const color = parentColor(thread);
   const glow = agentGlowForState(thread);
-  const bodyMaterial = new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.08 });
+  const bodyMaterial = new THREE.MeshStandardMaterial({
+    color: agentBodyColor(thread, color),
+    roughness: 0.38,
+    metalness: 0.28,
+    emissive: color,
+    emissiveIntensity: thread.state === "ACTIVE" ? 0.08 : 0.025,
+  });
   const headMaterial = new THREE.MeshStandardMaterial({
-    color: 0xf1f5f9,
-    roughness: 0.52,
-    metalness: 0.02,
-    emissive: 0x9ca3af,
-    emissiveIntensity: 0.015,
+    color: 0x08131d,
+    roughness: 0.36,
+    metalness: 0.2,
+    emissive: gridStudio.cyan,
+    emissiveIntensity: 0.03,
   });
   const glowMaterial = new THREE.MeshBasicMaterial({
     color: glow.color,
     transparent: true,
     opacity: glow.opacity,
+    blending: THREE.AdditiveBlending,
   });
 
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.3, 0.82, 24), bodyMaterial);
-  body.position.y = 0.55;
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.29, 0.9, 6), bodyMaterial);
+  body.position.y = 0.56;
   body.castShadow = true;
   body.userData.threadId = thread.id;
   group.add(body);
 
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.25, 20, 16), headMaterial);
-  head.position.y = 1.15;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.23, 16, 12), headMaterial);
+  head.scale.set(0.86, 1, 0.78);
+  head.position.y = 1.18;
   head.castShadow = true;
   head.userData.threadId = thread.id;
   group.add(head);
 
-  const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.34, 0.08, 20), bodyMaterial);
-  collar.position.y = 0.92;
+  const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.29, 0.31, 0.07, 6), bodyMaterial);
+  collar.position.y = 0.94;
   collar.castShadow = true;
   group.add(collar);
 
   const statusLightMaterial = new THREE.MeshBasicMaterial({
     color: glow.color,
     transparent: true,
-    opacity: thread.state === "ACTIVE" ? 0.9 : 0.36,
+    opacity: thread.state === "ACTIVE" ? 0.95 : 0.42,
+    blending: THREE.AdditiveBlending,
   });
-  const statusLight = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 8), statusLightMaterial);
-  statusLight.position.set(0, 1.42, 0.13);
+  const statusLight = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.045, 0.055), statusLightMaterial);
+  statusLight.position.set(0, 1.2, 0.19);
   group.add(statusLight);
 
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.47, 0.02, 8, 48), glowMaterial);
+  const suitLine = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.42, 0.055), glowMaterial);
+  suitLine.position.set(0, 0.58, 0.28);
+  group.add(suitLine);
+
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.018, 8, 48), glowMaterial);
   ring.rotation.x = Math.PI / 2;
-  ring.position.y = 0.09;
+  ring.position.y = 0.08;
   group.add(ring);
 
-  group.userData.parts = { body, head, collar, statusLight, ring, glowMaterial, statusLightMaterial };
+  group.userData.parts = { body, head, collar, statusLight, suitLine, ring, glowMaterial, statusLightMaterial };
   scene.add(group);
   state.selectable.push(body, head);
   return group;
@@ -854,23 +875,24 @@ function createDigestObject(parentGroup) {
   group.userData.digestKey = parentGroup.key;
 
   const baseMaterial = new THREE.MeshStandardMaterial({
-    color: 0x92400e,
-    roughness: 0.58,
-    metalness: 0.1,
-    emissive: 0x451a03,
-    emissiveIntensity: 0.1,
+    color: 0x2c1602,
+    roughness: 0.5,
+    metalness: 0.22,
+    emissive: 0x4a2100,
+    emissiveIntensity: 0.16,
   });
   const tokenMaterial = new THREE.MeshStandardMaterial({
     color: gridStudio.digest,
-    roughness: 0.42,
-    metalness: 0.18,
+    roughness: 0.36,
+    metalness: 0.28,
     emissive: gridStudio.digest,
-    emissiveIntensity: 0.14,
+    emissiveIntensity: 0.2,
   });
   const ringMaterial = new THREE.MeshBasicMaterial({
-    color: 0xfbbf24,
+    color: 0xffb000,
     transparent: true,
-    opacity: 0.34,
+    opacity: 0.46,
+    blending: THREE.AdditiveBlending,
   });
 
   const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.42, 0.18, 28), baseMaterial);
@@ -900,14 +922,14 @@ function updateDigestObjectReviewState(digestObject, reviewState) {
   digestObject.userData.doneObjectInactive = inactive;
   digestObject.userData.remainingReviewCount = reviewState.unreviewed;
 
-  parts.baseMaterial.color.setHex(inactive ? 0x1f2937 : 0x78350f);
-  parts.baseMaterial.emissive.setHex(inactive ? 0x000000 : 0x451a03);
-  parts.baseMaterial.emissiveIntensity = inactive ? 0 : 0.1;
+  parts.baseMaterial.color.setHex(inactive ? 0x101820 : 0x2c1602);
+  parts.baseMaterial.emissive.setHex(inactive ? 0x000000 : 0x4a2100);
+  parts.baseMaterial.emissiveIntensity = inactive ? 0 : 0.16;
   parts.tokenMaterial.color.setHex(inactive ? gridStudio.reviewed : gridStudio.digest);
   parts.tokenMaterial.emissive.setHex(inactive ? 0x000000 : gridStudio.digest);
-  parts.tokenMaterial.emissiveIntensity = inactive ? 0 : 0.14;
-  parts.ringMaterial.color.setHex(inactive ? 0x94a3b8 : 0xfbbf24);
-  parts.ringMaterial.opacity = inactive ? 0.1 : 0.34;
+  parts.tokenMaterial.emissiveIntensity = inactive ? 0 : 0.2;
+  parts.ringMaterial.color.setHex(inactive ? 0x4b6470 : 0xffb000);
+  parts.ringMaterial.opacity = inactive ? 0.12 : 0.46;
 }
 
 function updateDigestPickables(digestObject, parentGroup, room) {
@@ -1056,9 +1078,9 @@ function updateParentVisualState(parentAgent, parentKey) {
   });
   const parts = parentAgent.userData.parts;
   if (!parentGroup?.isActive) {
-    parts.glowMaterial.opacity = selected ? 0.34 : 0.16;
+    parts.glowMaterial.opacity = selected ? 0.34 : 0.2;
   }
-  parts.halo.scale.setScalar(selected ? 1.12 : 1);
+  parts.disc.scale.setScalar(selected ? 1.12 : 1);
   const label = state.parentLabels.get(parentKey);
   if (label) {
     label.classList.toggle("is-selected", selected);
@@ -1084,7 +1106,7 @@ function updateDigestVisualState(digestObject, digestKey) {
   const selected = selectedSceneObject({ type: "digest", digestKey });
   const parts = digestObject.userData.parts;
   if (digestObject.userData.doneObjectInactive) {
-    parts.ringMaterial.opacity = selected ? 0.24 : 0.1;
+    parts.ringMaterial.opacity = selected ? 0.24 : 0.12;
   }
   parts.ring.scale.setScalar(selected ? 1.12 : 1);
   const label = state.digestLabels.get(digestKey);
@@ -1230,11 +1252,11 @@ function reconcileAgents(projectGroups) {
 
       const parentParts = parentAgent.userData.parts;
       const parentColorHex = parentGroupColor(parentGroup);
-      parentParts.bodyMaterial.color.setHex(parentColorHex);
-      parentParts.bodyMaterial.emissive.setHex(parentGroup.isActive ? parentColorHex : 0x000000);
-      parentParts.bodyMaterial.emissiveIntensity = parentGroup.isActive ? 0.1 : 0;
+      parentParts.bodyMaterial.color.setHex(0x07111b);
+      parentParts.bodyMaterial.emissive.setHex(parentColorHex);
+      parentParts.bodyMaterial.emissiveIntensity = parentGroup.isActive ? 0.12 : 0.035;
       parentParts.glowMaterial.color.setHex(parentGroup.isActive ? gridStudio.active : parentColorHex);
-      parentParts.glowMaterial.opacity = parentGroup.isActive ? 0.56 : 0.16;
+      parentParts.glowMaterial.opacity = parentGroup.isActive ? 0.62 : 0.2;
       parentParts.body.userData.threadId = parentGroup.lead.id;
       parentParts.body.userData.thread = parentGroup.lead;
       parentParts.body.userData.parentGroup = parentGroup;
@@ -1243,7 +1265,7 @@ function reconcileAgents(projectGroups) {
       parentParts.head.userData.thread = parentGroup.lead;
       parentParts.head.userData.parentGroup = parentGroup;
       parentParts.head.userData.room = room;
-      for (const pickable of [parentParts.shoulder, parentParts.visor, parentParts.core]) {
+      for (const pickable of [parentParts.shoulder, parentParts.visor, parentParts.core, parentParts.belt, parentParts.disc]) {
         pickable.userData.threadId = parentGroup.lead.id;
         pickable.userData.thread = parentGroup.lead;
         pickable.userData.parentGroup = parentGroup;
@@ -1255,6 +1277,8 @@ function reconcileAgents(projectGroups) {
         parentParts.shoulder,
         parentParts.visor,
         parentParts.core,
+        parentParts.belt,
+        parentParts.disc,
       );
 
       const parentLabel = state.parentLabels.get(parentGroup.key);
@@ -1305,22 +1329,24 @@ function reconcileAgents(projectGroups) {
         const parts = agent.userData.parts;
         const glow = agentGlowForState(thread);
         parts.body.material.color.setHex(agentBodyColor(thread, parentColorHex));
+        parts.body.material.emissive.setHex(parentColorHex);
+        parts.body.material.emissiveIntensity = thread.state === "ACTIVE" ? 0.08 : 0.025;
         parts.glowMaterial.color.setHex(glow.color);
         parts.glowMaterial.opacity = glow.opacity;
         parts.statusLightMaterial.color.setHex(glow.color);
-        parts.statusLightMaterial.opacity = thread.state === "ACTIVE" ? 0.9 : Math.max(0.22, glow.opacity);
+        parts.statusLightMaterial.opacity = thread.state === "ACTIVE" ? 0.95 : 0.42;
         parts.body.userData.threadId = thread.id;
         parts.body.userData.thread = thread;
         parts.body.userData.room = room;
         parts.head.userData.threadId = thread.id;
         parts.head.userData.thread = thread;
         parts.head.userData.room = room;
-        for (const pickable of [parts.collar, parts.statusLight]) {
+        for (const pickable of [parts.collar, parts.statusLight, parts.suitLine]) {
           pickable.userData.threadId = thread.id;
           pickable.userData.thread = thread;
           pickable.userData.room = room;
         }
-        state.selectable.push(parts.body, parts.head, parts.collar, parts.statusLight);
+        state.selectable.push(parts.body, parts.head, parts.collar, parts.statusLight, parts.suitLine);
 
         const label = state.agentLabels.get(thread.id);
         label.textContent = visibleActivityLabel(
@@ -2193,7 +2219,7 @@ function animateAgents(elapsed) {
     parts.head.rotation.z = Math.sin(elapsed * speed) * (parentGroup?.isActive ? 0.04 : 0.01);
     parts.ring.scale.setScalar(1 + Math.sin(elapsed * speed) * (parentGroup?.isActive ? 0.08 : 0.012));
     parts.core.scale.setScalar(1 + Math.sin(elapsed * speed * 1.2) * (parentGroup?.isActive ? 0.12 : 0.02));
-    parts.halo.rotation.z = elapsed * (parentGroup?.isActive ? 0.7 : 0.18);
+    parts.disc.rotation.z = elapsed * (parentGroup?.isActive ? 0.7 : 0.18);
   }
 
   for (const handoff of state.handoffs.values()) {
@@ -2243,7 +2269,7 @@ function animateAgents(elapsed) {
       });
       parts.token.rotation.y = 0;
       parts.ring.scale.setScalar(selected ? 1.12 : 1);
-      parts.ringMaterial.opacity = selected ? 0.24 : 0.1;
+      parts.ringMaterial.opacity = selected ? 0.24 : 0.12;
       continue;
     }
     const pulse = 1 + Math.sin(elapsed * 1.7 + hashString(digestObject.userData.digestKey || "")) * 0.035;
@@ -2253,7 +2279,7 @@ function animateAgents(elapsed) {
     });
     parts.token.rotation.y = elapsed * 0.28;
     parts.ring.scale.setScalar(selected ? Math.max(1.12, pulse) : pulse);
-    parts.ringMaterial.opacity = 0.34;
+    parts.ringMaterial.opacity = 0.46;
   }
 }
 
