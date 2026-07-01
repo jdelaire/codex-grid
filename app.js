@@ -1724,6 +1724,7 @@ async function refreshThreads({ force = false } = {}) {
   if (
     !force &&
     state.lastPayload &&
+    !state.lastPayload.error &&
     fetchMaxAgeCovers(state.lastFetchMaxAgeHours, requestedFetchMaxAgeHours)
   ) {
     applyThreadsPayload(state.lastPayload);
@@ -1740,8 +1741,10 @@ async function refreshThreads({ force = false } = {}) {
     if (!fetchMaxAgeCovers(requestedFetchMaxAgeHours, currentFetchMaxAgeHours())) {
       return;
     }
-    state.lastPayload = payload;
-    state.lastFetchMaxAgeHours = requestedFetchMaxAgeHours;
+    if (!payload.error) {
+      state.lastPayload = payload;
+      state.lastFetchMaxAgeHours = requestedFetchMaxAgeHours;
+    }
     applyThreadsPayload(payload);
   } catch (error) {
     if (seq !== state.refreshSeq) {
