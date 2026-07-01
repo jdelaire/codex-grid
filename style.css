@@ -521,17 +521,6 @@ p {
   font-size: 12px;
 }
 
-.details-panel {
-  min-width: 0;
-  overflow: auto;
-  border-left: 1px solid var(--line);
-  background:
-    linear-gradient(180deg, rgba(17, 24, 39, 0.98), rgba(5, 8, 14, 0.98)),
-    var(--bg);
-  padding: 18px;
-  box-shadow: -24px 0 50px rgba(0, 0, 0, 0.24);
-}
-
 .review-lane {
   display: grid;
   gap: 10px;
@@ -986,6 +975,7 @@ dd {
 
   .inspector-overlay {
     top: auto;
-    bottom: 10px;
+    bottom: 82px;
+    max-height: calc(100vh - 150px);
   }
 }

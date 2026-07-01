@@ -226,6 +226,14 @@ test("renders nonblank scene and action inbox", async ({ page }) => {
   await expect(page.locator("#reviewPanelToggle")).toHaveCount(0);
   await expect(page.locator("#reviewStaleToggle")).toHaveCount(0);
   await expect(page.locator("#reviewUnreviewedToggle")).toHaveCount(0);
+  await expect(page.locator(".review-item.is-running")).toHaveCount(1);
+  await page.locator('[data-action-inbox-filter="needs_review"]').click();
+  await expect(page.locator('[data-action-inbox-filter="needs_review"]')).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.locator("#reviewList")).toContainText("Review sidebar");
+  await expect(page.locator(".review-item.is-running")).toHaveCount(0);
   await expect(
     page.locator(".review-item").filter({ hasText: "Review sidebar" }).locator(".review-toggle"),
   ).toHaveAttribute("aria-label", /Mark .* reviewed/);
@@ -337,10 +345,13 @@ test("mobile layout keeps scene and inspector details available", async ({ page 
   await expect(page.locator("#inspectorOverlay")).toBeVisible();
   await expect(page.locator("#detailTitle")).toContainText("Review sidebar");
   const inspectorBox = await page.locator("#inspectorOverlay").boundingBox();
+  const countersBox = await page.locator(".hud-counters").boundingBox();
   expect(inspectorBox).toBeTruthy();
+  expect(countersBox).toBeTruthy();
   expect(inspectorBox.width).toBeLessThanOrEqual(390);
   expect(inspectorBox.x).toBeGreaterThanOrEqual(0);
   expect(inspectorBox.x + inspectorBox.width).toBeLessThanOrEqual(390);
+  expect(inspectorBox.y + inspectorBox.height).toBeLessThanOrEqual(countersBox.y);
   await page.locator("#inspectorClose").click();
   await page.locator("#settingsToggle").click();
   await expect(page.locator("#settingsDialog")).toBeVisible();

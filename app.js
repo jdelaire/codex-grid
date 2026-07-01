@@ -1333,11 +1333,15 @@ function refreshActionInbox() {
 }
 
 function visibleActionInboxItems(inbox) {
-  return filterActionInboxItems(inbox, {
+  const items = filterActionInboxItems(inbox, {
     unreviewedOnly: false,
     filter: state.actionInboxFilter,
     showStale: true,
   });
+  if (!state.actionInboxFilter) {
+    return items;
+  }
+  return items.filter((item) => item.type === state.actionInboxFilter);
 }
 
 function actionInboxTypeLabel(type) {
