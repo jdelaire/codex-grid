@@ -34,13 +34,19 @@ The app is intentionally small:
 python3 server.py --port 8765
 ```
 
-By default, Codims listens on `0.0.0.0` so it can be reached from other devices on your network. Open locally:
+By default, Codims listens on `127.0.0.1` so local Codex thread data is not exposed on your LAN. Open locally:
 
 ```text
 http://127.0.0.1:8765/
 ```
 
-From another device, use your machine's LAN IP:
+LAN access is opt-in. Only use this on a trusted network because Codims displays local Codex thread metadata:
+
+```bash
+python3 server.py --host 0.0.0.0 --port 8765
+```
+
+Then open from another device:
 
 ```text
 http://<machine-ip>:8765/

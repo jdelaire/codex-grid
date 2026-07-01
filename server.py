@@ -838,7 +838,7 @@ def make_handler(static_dir, client_factory=None):
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser()
-    parser.add_argument("--host", default="0.0.0.0")
+    parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--codex-bin", default="codex")
     parser.add_argument(

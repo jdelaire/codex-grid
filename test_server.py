@@ -1056,5 +1056,20 @@ class HttpHandlerTests(unittest.TestCase):
         self.assertEqual(self.fake.calls, [])
 
 
+class ServerCliTests(unittest.TestCase):
+    def test_parse_args_defaults_to_localhost(self):
+        args = server.parse_args([])
+
+        self.assertEqual(args.host, "127.0.0.1")
+        self.assertEqual(args.port, 8765)
+        self.assertEqual(args.codex_bin, "codex")
+
+    def test_parse_args_allows_explicit_lan_host(self):
+        args = server.parse_args(["--host", "0.0.0.0", "--port", "9000"])
+
+        self.assertEqual(args.host, "0.0.0.0")
+        self.assertEqual(args.port, 9000)
+
+
 if __name__ == "__main__":
     unittest.main()

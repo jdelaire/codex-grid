@@ -2,6 +2,8 @@
 
 Codims is a local developer tool. It reads local Codex thread data through the Codex app-server and serves a browser UI on `127.0.0.1` by default.
 
+LAN access is available only when explicitly requested with `--host 0.0.0.0` or `HOST=0.0.0.0 ./launch.sh`. Do not use LAN mode on an untrusted network; Codims has no authentication layer and displays local Codex thread metadata.
+
 ## Sensitive Data
 
 Before publishing changes, check that commits do not include:

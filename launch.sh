@@ -3,7 +3,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-HOST="${HOST:-0.0.0.0}"
+HOST="${HOST:-127.0.0.1}"
 PORT="${PORT:-8765}"
 CODEX_BIN="${CODEX_BIN:-codex}"
 URL_HOST="${HOST}"
