@@ -15,57 +15,46 @@
     </script>
   </head>
   <body>
-    <header class="app-header">
-      <div class="brand-lockup">
-        <h1>Codims</h1>
-        <p id="statusText">Loading Codex rooms...</p>
-      </div>
-      <div class="counters" aria-label="Codims counters">
-        <div class="counter">
-          <span id="activeCount">0</span>
-          <span class="counter-label">running now</span>
-        </div>
-        <div class="counter">
-          <span id="visibleCount">0</span>
-          <span class="counter-label">visible threads</span>
-        </div>
-        <div class="counter">
-          <span id="projectCount">0</span>
-          <span class="counter-label">projects</span>
-        </div>
-      </div>
-      <form class="controls" id="controls">
-        <label>
-          Max age
-          <input id="maxAgeHours" name="maxAgeHours" type="number" min="0" step="1" value="8">
-          <span>h</span>
-        </label>
-        <label>
-          Density
-          <select id="densityMode" name="densityMode">
-            <option value="normal">Normal</option>
-            <option value="compact">Compact</option>
-          </select>
-        </label>
-        <label class="search-control">
-          Search
-          <input id="threadSearch" name="threadSearch" type="search" placeholder="project, thread, agent">
-        </label>
-        <button id="liveToggle" type="button" aria-pressed="true">Live</button>
-        <button id="labelsToggle" type="button" aria-pressed="true">Labels</button>
-        <button id="privacyToggle" type="button" aria-pressed="false">Privacy</button>
-        <button id="inactiveToggle" type="button" aria-pressed="false">Show idle</button>
-      </form>
-    </header>
-
-    <main class="app-layout">
+    <main class="app-shell">
       <section class="scene-shell" aria-label="3D Codex worker rooms">
         <div id="scene"></div>
         <div id="labels" class="labels-layer"></div>
-        <div id="emptyState" class="empty-state" hidden>No recent open subagent threads.</div>
       </section>
 
-      <aside class="details-panel" aria-label="Thread details">
+      <div class="hud-layer" aria-label="Codims controls">
+        <div class="hud-status" role="status" aria-live="polite">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span id="statusText">Loading Codex rooms...</span>
+        </div>
+
+        <div class="counters hud-counters" aria-label="Codims counters">
+          <div class="counter">
+            <span id="activeCount">0</span>
+            <span class="counter-label">running now</span>
+          </div>
+          <div class="counter">
+            <span id="visibleCount">0</span>
+            <span class="counter-label">visible threads</span>
+          </div>
+          <div class="counter">
+            <span id="projectCount">0</span>
+            <span class="counter-label">projects</span>
+          </div>
+        </div>
+
+        <div class="hud-actions" aria-label="Overlay actions">
+          <button id="inboxToggle" class="hud-icon-button" type="button" aria-expanded="false" aria-controls="inboxDrawer" title="Action inbox">
+            <span aria-hidden="true">Inbox</span>
+            <span id="inboxBadge" class="hud-badge">0</span>
+          </button>
+          <button id="settingsToggle" class="hud-icon-button" type="button" aria-haspopup="dialog" aria-controls="settingsDialog" title="Settings">
+            <span aria-hidden="true">Settings</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Temporary overlay containers follow; later tasks refine their contents. -->
+      <aside id="inboxDrawer" class="inbox-drawer" hidden>
         <section class="review-lane" aria-labelledby="reviewLaneTitle">
           <div class="review-lane-header">
             <div>
@@ -98,6 +87,9 @@
           </div>
           <div id="reviewList" class="review-list"></div>
         </section>
+      </aside>
+
+      <aside id="inspectorOverlay" class="inspector-overlay" hidden>
         <div id="detailsEmpty" class="details-empty">
           Click a worker to inspect its thread.
         </div>
@@ -150,6 +142,25 @@
           </dialog>
         </div>
       </aside>
+
+      <dialog id="settingsDialog" class="settings-dialog">
+        <form method="dialog">
+          <label>
+            Max age
+            <input id="maxAgeHours" name="maxAgeHours" type="number" min="0" step="1" value="8">
+            <span>h</span>
+          </label>
+          <label>
+            Density
+            <select id="densityMode" name="densityMode">
+              <option value="normal">Normal</option>
+              <option value="compact">Compact</option>
+            </select>
+          </label>
+          <button id="privacyToggle" type="button" aria-pressed="false">Privacy</button>
+          <button id="inactiveToggle" type="button" aria-pressed="false">Show idle</button>
+        </form>
+      </dialog>
     </main>
 
     <script type="module" src="./app.js"></script>

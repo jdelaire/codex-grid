@@ -206,9 +206,16 @@ test.afterEach(() => {
 
 test("renders nonblank scene and action inbox", async ({ page }) => {
   await page.goto(`${baseUrl}/index.html`);
+  await expect(page.locator(".app-shell")).toBeVisible();
+  await expect(page.locator(".app-header")).toHaveCount(0);
+  await expect(page.locator(".details-panel")).toHaveCount(0);
   await expect(page.locator("#scene canvas")).toBeVisible();
+  await expect(page.locator("#statusText")).toBeVisible();
   await expect(page.locator("#activeCount")).toHaveText("1");
   await expect(page.locator("#visibleCount")).toHaveText("3");
+  await expect(page.locator("#projectCount")).toHaveText("1");
+  await expect(page.locator("#inboxToggle")).toBeVisible();
+  await expect(page.locator("#settingsToggle")).toBeVisible();
   await expect(page.locator("#reviewList")).toContainText("Review sidebar");
   await page.locator(".review-item-main").filter({ hasText: "Review sidebar" }).click();
   await expect(page.locator("#detailTitle")).toContainText("Review sidebar");

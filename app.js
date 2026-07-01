@@ -35,24 +35,23 @@ import {
 } from "./visual-model.mjs";
 
 const dom = {
-  appLayout: document.querySelector(".app-layout"),
   scene: document.querySelector("#scene"),
   labels: document.querySelector("#labels"),
-  emptyState: document.querySelector("#emptyState"),
   statusText: document.querySelector("#statusText"),
   activeCount: document.querySelector("#activeCount"),
   activeCounter: document.querySelector("#activeCount").closest(".counter"),
   visibleCount: document.querySelector("#visibleCount"),
   projectCount: document.querySelector("#projectCount"),
-  controls: document.querySelector("#controls"),
+  inboxToggle: document.querySelector("#inboxToggle"),
+  inboxBadge: document.querySelector("#inboxBadge"),
+  settingsToggle: document.querySelector("#settingsToggle"),
+  inboxDrawer: document.querySelector("#inboxDrawer"),
+  inspectorOverlay: document.querySelector("#inspectorOverlay"),
+  settingsDialog: document.querySelector("#settingsDialog"),
   maxAgeHours: document.querySelector("#maxAgeHours"),
   densityMode: document.querySelector("#densityMode"),
-  threadSearch: document.querySelector("#threadSearch"),
-  liveToggle: document.querySelector("#liveToggle"),
-  labelsToggle: document.querySelector("#labelsToggle"),
   privacyToggle: document.querySelector("#privacyToggle"),
   inactiveToggle: document.querySelector("#inactiveToggle"),
-  detailsPanel: document.querySelector(".details-panel"),
   reviewLane: document.querySelector(".review-lane"),
   reviewPanelToggle: document.querySelector("#reviewPanelToggle"),
   reviewStaleToggle: document.querySelector("#reviewStaleToggle"),
@@ -182,7 +181,6 @@ const state = {
   threads: [],
   lastPayload: null,
   lastFetchMaxAgeHours: null,
-  localRenderTimer: null,
   rooms: new Map(),
   parentAgents: new Map(),
   agents: new Map(),
@@ -1337,10 +1335,6 @@ function updateCounters(projectGroups) {
   dom.activeCounter.setAttribute("aria-label", `${activeThreads} running now`);
   dom.visibleCount.textContent = String(visibleThreads);
   dom.projectCount.textContent = String(projectGroups.length);
-  dom.emptyState.textContent = state.showInactive
-    ? "No recent open threads."
-    : "No active threads. Show idle to see recent threads.";
-  dom.emptyState.hidden = visibleThreads !== 0;
 }
 
 function currentStaleBeforeMs() {
@@ -1413,7 +1407,9 @@ function renderReviewLane() {
   const inbox = state.actionInbox || buildActionInbox([]);
   const counts = inbox.counts || {};
   const visibleItems = visibleActionInboxItems(inbox);
+  const badgeCount = (counts.needs_review || 0) + (counts.running || 0) + (counts.stale || 0);
 
+  dom.inboxBadge.textContent = String(badgeCount);
   dom.reviewCount.textContent = `${counts.needs_review || 0} needs review / ${
     counts.running || 0
   } running / ${counts.stale || 0} stale / ${counts.reviewed || 0} reviewed`;
@@ -1670,14 +1666,6 @@ function refreshSelectedDetails(projectGroups) {
   } else {
     clearDetails();
   }
-}
-
-function scheduleLocalThreadRender() {
-  window.clearTimeout(state.localRenderTimer);
-  state.localRenderTimer = window.setTimeout(() => {
-    state.localRenderTimer = null;
-    refreshThreads();
-  }, 80);
 }
 
 async function refreshThreads({ force = false } = {}) {
@@ -2258,19 +2246,6 @@ function animate() {
   renderer.render(scene, camera);
 }
 
-function setLive(nextLive) {
-  state.live = nextLive;
-  dom.liveToggle.textContent = nextLive ? "Live" : "Paused";
-  dom.liveToggle.setAttribute("aria-pressed", String(nextLive));
-}
-
-function setLabels(nextLabels) {
-  state.labels = nextLabels;
-  dom.labelsToggle.setAttribute("aria-pressed", String(nextLabels));
-  dom.labels.classList.toggle("is-hidden", !nextLabels);
-  savePreferences();
-}
-
 function updatePrivacySensitiveUi() {
   for (const [parentKey, label] of state.parentLabels.entries()) {
     const parentGroup = state.parentAgents.get(parentKey)?.userData.parentGroup;
@@ -2341,8 +2316,6 @@ function setReviewPanelExpanded(nextExpanded, { persist = true } = {}) {
   dom.reviewPanelToggle.textContent = nextExpanded ? "Compact" : "Expand";
   dom.reviewPanelToggle.setAttribute("aria-pressed", String(nextExpanded));
   dom.reviewLane.classList.toggle("is-expanded", nextExpanded);
-  dom.detailsPanel.classList.toggle("is-review-expanded", nextExpanded);
-  dom.appLayout.classList.toggle("is-review-expanded", nextExpanded);
   if (persist) {
     savePreferences();
   }
@@ -2455,11 +2428,6 @@ function bindEvents() {
   renderer.domElement.addEventListener("pointerdown", onPointerDown);
   renderer.domElement.addEventListener("pointerup", onPointerUp);
   renderer.domElement.addEventListener("pointercancel", onPointerCancel);
-  dom.controls.addEventListener("submit", (event) => {
-    event.preventDefault();
-    savePreferences();
-    refreshThreads();
-  });
   dom.maxAgeHours.addEventListener("change", () => {
     savePreferences();
     refreshThreads();
@@ -2469,12 +2437,6 @@ function bindEvents() {
     savePreferences();
     refreshThreads();
   });
-  dom.threadSearch.addEventListener("input", () => {
-    state.search = dom.threadSearch.value;
-    scheduleLocalThreadRender();
-  });
-  dom.liveToggle.addEventListener("click", () => setLive(!state.live));
-  dom.labelsToggle.addEventListener("click", () => setLabels(!state.labels));
   dom.privacyToggle.addEventListener("click", () => setPrivacy(!state.privacy));
   dom.inactiveToggle.addEventListener("click", () => setShowInactive(!state.showInactive));
   dom.reviewPanelToggle.addEventListener("click", () => setReviewPanelExpanded(!state.reviewPanelExpanded));
@@ -2516,9 +2478,10 @@ state.density = prefs.density;
 dom.densityMode.value = prefs.density;
 setReviewPanelExpanded(prefs.reviewPanelExpanded, { persist: false });
 setShowStale(prefs.showStale, { persist: false, render: false });
-setLabels(prefs.labels);
+state.labels = true;
+state.live = true;
+dom.labels.classList.toggle("is-hidden", false);
 setShowInactive(prefs.showInactive, { refresh: false });
 setPrivacy(prefs.privacy, { refresh: false });
-setLive(true);
 startPolling();
 animate();
