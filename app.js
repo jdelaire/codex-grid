@@ -1737,6 +1737,9 @@ async function refreshThreads({ force = false } = {}) {
     if (seq !== state.refreshSeq) {
       return;
     }
+    if (!fetchMaxAgeCovers(requestedFetchMaxAgeHours, currentFetchMaxAgeHours())) {
+      return;
+    }
     state.lastPayload = payload;
     state.lastFetchMaxAgeHours = requestedFetchMaxAgeHours;
     applyThreadsPayload(payload);
