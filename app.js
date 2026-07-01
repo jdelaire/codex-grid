@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { cssHexColor, formatAge, visibleActivityLabel } from "./ui-format.mjs";
+import { disposeObject3D } from "./three-disposal.mjs";
 import {
   actionInboxFetchMaxAgeHours,
   actionInboxItemParentKey,
@@ -280,22 +282,6 @@ function parentColor(thread) {
 
 function parentGroupColor(parentGroup) {
   return colorFromKey(parentGroup.colorKey || parentGroup.parentId || parentGroup.project || "thread");
-}
-
-function cssHexColor(hexColor) {
-  return `#${hexColor.toString(16).padStart(6, "0")}`;
-}
-
-function formatAge(seconds) {
-  if (seconds < 60) {
-    return `${seconds}s`;
-  }
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) {
-    return `${minutes}m`;
-  }
-  const hours = Math.floor(minutes / 60);
-  return `${hours}h`;
 }
 
 function roomPosition(index, total, gapX = 11, gapZ = 8.5) {
@@ -650,41 +636,11 @@ function updateRoomSize(room, layout) {
   room.userData.size = { width, depth };
 }
 
-function disposeMaterial(material) {
-  if (Array.isArray(material)) {
-    for (const item of material) {
-      disposeMaterial(item);
-    }
-    return;
-  }
-  if (material) {
-    if (material.map) {
-      material.map.dispose();
-    }
-    material.dispose();
-  }
-}
-
-function disposeObject3D(object) {
-  object.traverse((child) => {
-    if (child.geometry) {
-      child.geometry.dispose();
-    }
-    if (child.material) {
-      disposeMaterial(child.material);
-    }
-  });
-}
-
 function createLabel(className) {
   const label = document.createElement("div");
   label.className = className;
   dom.labels.appendChild(label);
   return label;
-}
-
-function visibleActivityLabel(text, isRunning) {
-  return isRunning ? `RUNNING - ${text}` : text;
 }
 
 function agentGlowForState(thread) {
