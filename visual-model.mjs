@@ -200,13 +200,13 @@ export function actionInboxFetchMaxAgeHours(maxAgeHours) {
 export function fetchMaxAgeCovers(cachedMaxAgeHours, requestedMaxAgeHours) {
   const cached = Number(cachedMaxAgeHours);
   const requested = Number(requestedMaxAgeHours);
+  if (!Number.isFinite(cached) || cached < 0 || !Number.isFinite(requested) || requested < 0) {
+    return false;
+  }
   if (cached === 0) {
     return true;
   }
   if (requested === 0) {
-    return false;
-  }
-  if (!Number.isFinite(cached) || cached < 0 || !Number.isFinite(requested) || requested < 0) {
     return false;
   }
   return cached >= requested;

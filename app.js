@@ -1715,11 +1715,7 @@ function scheduleLocalThreadRender() {
   window.clearTimeout(state.localRenderTimer);
   state.localRenderTimer = window.setTimeout(() => {
     state.localRenderTimer = null;
-    if (state.lastPayload) {
-      applyThreadsPayload(state.lastPayload);
-    } else {
-      refreshThreads({ force: true });
-    }
+    refreshThreads();
   }, 80);
 }
 
