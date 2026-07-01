@@ -234,14 +234,46 @@ test("renders nonblank scene and action inbox", async ({ page }) => {
   await expect(page.locator("#inboxToggle")).toHaveAttribute("aria-expanded", "false");
   await page.locator("#inboxToggle").click();
   await page.locator(".review-item-main").filter({ hasText: "Review sidebar" }).click();
+  await expect(page.locator("#inspectorOverlay")).toBeVisible();
   await expect(page.locator("#detailTitle")).toContainText("Review sidebar");
-  await expect(page.locator("#threadMessageForm")).toBeHidden();
-  await expect(page.locator("#threadMessageInput")).toBeDisabled();
-  await expect(page.locator("#threadMessagePreview")).toBeDisabled();
-  await expect(page.locator("#threadMessageSubmit")).toBeDisabled();
+  await expect(page.locator("#threadMessageForm")).toHaveCount(0);
+  await expect(page.locator("#threadMessageInput")).toHaveCount(0);
+  await expect(page.locator("#threadMessagePreview")).toHaveCount(0);
+  await expect(page.locator("#threadMessageSubmit")).toHaveCount(0);
+  await page.locator("#inspectorClose").click();
+  await expect(page.locator("#inspectorOverlay")).toBeHidden();
 
   const nonBlank = await hasNonBlankScreenshot(page, page.locator("#scene canvas"));
   expect(nonBlank).toBe(true);
+});
+
+test("keeps inspector dismissed after delayed detail load", async ({ page }) => {
+  let resolveThreadDetail;
+  const threadDetailReady = new Promise((resolve) => {
+    resolveThreadDetail = resolve;
+  });
+
+  await page.unroute("**/api/thread/*");
+  await page.route("**/api/thread/*", async (route) => {
+    if (route.request().method() !== "GET") {
+      await route.fulfill({ status: 500, body: "Unexpected smoke test message request" });
+      return;
+    }
+    await threadDetailReady;
+    await route.fulfill({ json: threadDetailPayload });
+  });
+
+  await page.goto(`${baseUrl}/index.html`);
+  await page.locator("#inboxToggle").click();
+  await page.locator(".review-item-main").filter({ hasText: "Review sidebar" }).click();
+  await expect(page.locator("#inspectorOverlay")).toBeVisible();
+  await expect(page.locator("#detailThreadContent")).toContainText("Loading thread content");
+  await page.locator("#inspectorClose").click();
+  await expect(page.locator("#inspectorOverlay")).toBeHidden();
+
+  resolveThreadDetail();
+  await expect(page.locator("#detailThreadContent")).toContainText("Sidebar reviewed");
+  await expect(page.locator("#inspectorOverlay")).toBeHidden();
 });
 
 test("privacy mode hides sidebar content", async ({ page }) => {

@@ -85,11 +85,12 @@
         </section>
       </aside>
 
-      <aside id="inspectorOverlay" class="inspector-overlay" hidden>
-        <div id="detailsEmpty" class="details-empty">
-          Click a worker to inspect its thread.
+      <aside id="inspectorOverlay" class="inspector-overlay" aria-label="Thread details" hidden>
+        <div class="inspector-header">
+          <span class="inspector-kicker">Thread details</span>
+          <button id="inspectorClose" class="overlay-close" type="button" aria-label="Close thread details">Close</button>
         </div>
-        <div id="detailsContent" class="details-content" hidden>
+        <div id="detailsContent" class="details-content">
           <div class="details-heading">
             <h2 id="detailNickname"></h2>
             <span id="detailState"></span>
@@ -112,30 +113,6 @@
             <dt>Thread id</dt>
             <dd id="detailId" class="wrapped mono"></dd>
           </dl>
-          <form id="threadMessageForm" class="thread-message" hidden>
-            <label for="threadMessageInput">Send to main thread</label>
-            <textarea
-              id="threadMessageInput"
-              rows="4"
-              placeholder="Message this thread"
-            ></textarea>
-            <div class="thread-message-actions">
-              <button id="threadMessagePreview" type="button">Preview</button>
-              <button id="threadMessageSubmit" type="submit">Send</button>
-              <span id="threadMessageStatus" role="status"></span>
-            </div>
-          </form>
-          <dialog id="sendConfirmDialog" class="send-dialog">
-            <form method="dialog">
-              <h3>Send to thread?</h3>
-              <p id="sendConfirmTarget"></p>
-              <pre id="sendConfirmMessage"></pre>
-              <menu>
-                <button value="cancel">Cancel</button>
-                <button id="sendConfirmSubmit" value="send">Send</button>
-              </menu>
-            </form>
-          </dialog>
         </div>
       </aside>
 

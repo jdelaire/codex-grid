@@ -48,6 +48,7 @@ const dom = {
   inboxDrawer: document.querySelector("#inboxDrawer"),
   inboxClose: document.querySelector("#inboxClose"),
   inspectorOverlay: document.querySelector("#inspectorOverlay"),
+  inspectorClose: document.querySelector("#inspectorClose"),
   settingsDialog: document.querySelector("#settingsDialog"),
   maxAgeHours: document.querySelector("#maxAgeHours"),
   densityMode: document.querySelector("#densityMode"),
@@ -62,7 +63,6 @@ const dom = {
     ]),
   ),
   reviewList: document.querySelector("#reviewList"),
-  detailsEmpty: document.querySelector("#detailsEmpty"),
   detailsContent: document.querySelector("#detailsContent"),
   detailNickname: document.querySelector("#detailNickname"),
   detailState: document.querySelector("#detailState"),
@@ -75,15 +75,6 @@ const dom = {
   detailParent: document.querySelector("#detailParent"),
   detailCwd: document.querySelector("#detailCwd"),
   detailId: document.querySelector("#detailId"),
-  threadMessageForm: document.querySelector("#threadMessageForm"),
-  threadMessageInput: document.querySelector("#threadMessageInput"),
-  threadMessagePreview: document.querySelector("#threadMessagePreview"),
-  threadMessageSubmit: document.querySelector("#threadMessageSubmit"),
-  threadMessageStatus: document.querySelector("#threadMessageStatus"),
-  sendConfirmDialog: document.querySelector("#sendConfirmDialog"),
-  sendConfirmTarget: document.querySelector("#sendConfirmTarget"),
-  sendConfirmMessage: document.querySelector("#sendConfirmMessage"),
-  sendConfirmSubmit: document.querySelector("#sendConfirmSubmit"),
 };
 
 const parentPalette = [
@@ -162,6 +153,7 @@ const state = {
   search: "",
   inboxOpen: false,
   actionInboxFilter: null,
+  inspectorOpen: false,
   actionInbox: buildActionInbox([]),
   reviewedThreadIds: loadReviewedThreadIds(),
   reviewItems: [],
@@ -186,8 +178,6 @@ const state = {
   handoffs: new Map(),
   detailCache: new Map(),
   detailSeq: 0,
-  sendSeq: 0,
-  sendPending: false,
   refreshing: false,
   cameraFocus: null,
   selectable: [],
@@ -1524,18 +1514,6 @@ async function fetchThreadDetail(threadId) {
   return response.json();
 }
 
-async function sendThreadMessage(threadId, message, role) {
-  const response = await fetch(`/api/thread/${encodeURIComponent(threadId)}/message`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message, role }),
-  });
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
-  }
-  return response.json();
-}
-
 function visibleParentGroups() {
   return state.actionInboxProjectGroups.flatMap((projectGroup) => projectGroup.parentGroups || []);
 }
@@ -1706,7 +1684,6 @@ async function refreshThreads({ force = false } = {}) {
 }
 
 function showDetails(thread, parentGroup = null) {
-  const changedSelection = state.selectedId !== thread.id;
   state.selectedMode = "thread";
   state.selectedProject = null;
   state.selectedDigest = null;
@@ -1714,11 +1691,8 @@ function showDetails(thread, parentGroup = null) {
   state.selectedId = thread.id;
   state.selectedThread = thread;
   updateSceneVisualStates();
-  if (changedSelection) {
-    dom.threadMessageInput.value = "";
-    dom.threadMessageStatus.textContent = "";
-  }
   renderDetails(thread, parentGroup);
+  setInspectorOpen(true);
   if (parentGroup) {
     state.detailSeq += 1;
     return;
@@ -1735,10 +1709,8 @@ function showDigest(parentGroup) {
   state.selectedThread = null;
   updateSceneVisualStates();
   state.detailSeq += 1;
-  state.sendSeq += 1;
-  dom.threadMessageInput.value = "";
-  dom.threadMessageStatus.textContent = "";
   renderDigestDetails(parentGroup);
+  setInspectorOpen(true);
 }
 
 function showRoomFocus(room) {
@@ -1749,36 +1721,9 @@ function showRoomFocus(room) {
   state.selectedId = null;
   state.selectedThread = null;
   state.detailSeq += 1;
-  state.sendSeq += 1;
-  dom.threadMessageInput.value = "";
-  dom.threadMessageStatus.textContent = "";
-  dom.detailsEmpty.hidden = false;
-  dom.detailsContent.hidden = true;
-  updateMessageComposer(null);
+  setInspectorOpen(false);
   updateAgentLabelVisibility();
   updateSceneVisualStates();
-}
-
-function canSendToThread(_thread) {
-  return false;
-}
-
-function updateThreadSendControls(thread) {
-  const disabled = state.sendPending || !canSendToThread(thread);
-  dom.threadMessagePreview.disabled = disabled;
-  dom.threadMessageSubmit.disabled = disabled;
-  dom.sendConfirmSubmit.disabled = disabled;
-}
-
-function updateMessageComposer(thread) {
-  const canSend = canSendToThread(thread);
-  dom.threadMessageForm.hidden = !canSend;
-  dom.threadMessageInput.disabled = !canSend;
-  updateThreadSendControls(thread);
-  if (!canSend) {
-    dom.threadMessageInput.value = "";
-    dom.threadMessageStatus.textContent = "";
-  }
 }
 
 function renderDetails(thread, parentGroup = null) {
@@ -1790,8 +1735,6 @@ function renderDetails(thread, parentGroup = null) {
   state.selectedDigest = null;
   state.selectedThread = thread;
   updateAgentLabelVisibility();
-  dom.detailsEmpty.hidden = true;
-  dom.detailsContent.hidden = false;
   dom.detailNickname.textContent = privacyLabel(thread.nickname || "agent", state.privacy);
   dom.detailState.textContent = `${threadActivityLabel(thread)} / ${thread.intensity || "idle"}`;
   dom.detailState.classList.toggle("is-running", thread.state === "ACTIVE");
@@ -1813,7 +1756,6 @@ function renderDetails(thread, parentGroup = null) {
   dom.detailParent.textContent = privacyLabel(thread.parent_title || "(none)", state.privacy);
   dom.detailCwd.textContent = privacyPath(thread.cwd || "(unknown)", state.privacy);
   dom.detailId.textContent = privacyLabel(thread.id, state.privacy);
-  updateMessageComposer(thread);
 }
 
 function digestDetailThread(item) {
@@ -1901,8 +1843,6 @@ function renderParentTimeline(parentGroup) {
 function renderDigestDetails(parentGroup) {
   state.selectedDigest = parentGroup;
   updateAgentLabelVisibility();
-  dom.detailsEmpty.hidden = true;
-  dom.detailsContent.hidden = false;
   dom.detailNickname.textContent = privacyLabel(parentGroup.title || "Finished agents", state.privacy);
   dom.detailState.textContent = "DONE DIGEST";
   dom.detailState.classList.toggle("is-running", false);
@@ -1961,7 +1901,6 @@ function renderDigestDetails(parentGroup) {
   }
 
   dom.detailThreadContent.replaceChildren(list);
-  updateMessageComposer(null);
 }
 
 async function loadThreadDetail(thread) {
@@ -2003,10 +1942,8 @@ function clearDetails() {
   state.selectedId = null;
   state.selectedThread = null;
   updateAgentLabelVisibility();
-  dom.detailsEmpty.hidden = false;
-  dom.detailsContent.hidden = true;
+  setInspectorOpen(false);
   updateSceneVisualStates();
-  updateMessageComposer(null);
 }
 
 function vectorFromPlain(value) {
@@ -2279,10 +2216,6 @@ function updatePrivacySensitiveUi() {
   }
 
   renderReviewLane();
-
-  if (dom.sendConfirmDialog.open) {
-    updateSendConfirmTarget(state.selectedThread);
-  }
 }
 
 function setPrivacy(nextPrivacy, { refresh = true } = {}) {
@@ -2312,93 +2245,9 @@ function setInboxOpen(nextOpen) {
   dom.inboxToggle.setAttribute("aria-expanded", String(nextOpen));
 }
 
-async function onThreadMessageSubmit(event) {
-  event.preventDefault();
-  showSendConfirmation();
-}
-
-function showSendConfirmation() {
-  if (state.sendPending) {
-    return;
-  }
-  const thread = state.selectedThread;
-  const message = dom.threadMessageInput.value.trim();
-  if (!canSendToThread(thread)) {
-    return;
-  }
-  if (!message) {
-    dom.threadMessageStatus.textContent = "Message is empty.";
-    return;
-  }
-  updateSendConfirmTarget(thread);
-  dom.sendConfirmMessage.textContent = message;
-  dom.sendConfirmDialog.returnValue = "";
-  dom.sendConfirmDialog.showModal();
-}
-
-function updateSendConfirmTarget(thread) {
-  if (!thread) {
-    dom.sendConfirmTarget.textContent = "";
-    return;
-  }
-  dom.sendConfirmTarget.textContent = state.privacy
-    ? "Hidden"
-    : `${thread.title || thread.nickname} (${thread.id})`;
-}
-
-async function onSendConfirmClose() {
-  const returnValue = dom.sendConfirmDialog.returnValue;
-  dom.sendConfirmDialog.returnValue = "";
-  if (returnValue !== "send") {
-    return;
-  }
-  await sendConfirmedThreadMessage();
-}
-
-async function sendConfirmedThreadMessage() {
-  if (state.sendPending) {
-    return;
-  }
-  const thread = state.selectedThread;
-  if (!canSendToThread(thread)) {
-    return;
-  }
-
-  const message = dom.threadMessageInput.value.trim();
-  if (!message) {
-    dom.threadMessageStatus.textContent = "Message is empty.";
-    return;
-  }
-
-  const seq = ++state.sendSeq;
-  state.sendPending = true;
-  updateThreadSendControls(thread);
-  dom.threadMessageStatus.textContent = "Sending...";
-
-  try {
-    const payload = await sendThreadMessage(thread.id, message, thread.role);
-    if (seq !== state.sendSeq || state.selectedId !== thread.id) {
-      return;
-    }
-    if (!payload.sent) {
-      throw new Error(payload.error || "send failed");
-    }
-    dom.threadMessageInput.value = "";
-    dom.threadMessageStatus.textContent = "Sent.";
-    state.detailCache.delete(thread.id);
-    loadThreadDetail(thread);
-    refreshThreads({ force: true });
-  } catch (error) {
-    if (seq !== state.sendSeq || state.selectedId !== thread.id) {
-      return;
-    }
-    dom.threadMessageStatus.textContent = `Send failed: ${error.message}`;
-  } finally {
-    if (seq === state.sendSeq) {
-      state.sendPending = false;
-      updateMessageComposer(state.selectedThread);
-    }
-  }
+function setInspectorOpen(nextOpen) {
+  state.inspectorOpen = nextOpen;
+  dom.inspectorOverlay.hidden = !nextOpen;
 }
 
 function bindEvents() {
@@ -2419,6 +2268,7 @@ function bindEvents() {
   dom.inactiveToggle.addEventListener("click", () => setShowInactive(!state.showInactive));
   dom.inboxToggle.addEventListener("click", () => setInboxOpen(!state.inboxOpen));
   dom.inboxClose.addEventListener("click", () => setInboxOpen(false));
+  dom.inspectorClose.addEventListener("click", () => setInspectorOpen(false));
   for (const button of dom.actionInboxButtons) {
     button.addEventListener("click", () => {
       const filter = button.dataset.actionInboxFilter;
@@ -2426,9 +2276,6 @@ function bindEvents() {
       renderReviewLane();
     });
   }
-  dom.threadMessageForm.addEventListener("submit", onThreadMessageSubmit);
-  dom.threadMessagePreview.addEventListener("click", showSendConfirmation);
-  dom.sendConfirmDialog.addEventListener("close", onSendConfirmClose);
 }
 
 function startPolling() {
