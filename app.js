@@ -349,6 +349,44 @@ function updateProjectDisplayTexture(texture, project, count, privacyMode = fals
   texture.needsUpdate = true;
 }
 
+function createGlowBox(width, height, depth, color, opacity) {
+  return new THREE.Mesh(
+    new THREE.BoxGeometry(width, height, depth),
+    new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    }),
+  );
+}
+
+function createFloorCircuitLines(color) {
+  const group = new THREE.Group();
+  const material = new THREE.MeshBasicMaterial({
+    color,
+    transparent: true,
+    opacity: 0.42,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const lineSpecs = [
+    { x: 0, z: 0, width: 1, depth: 0.025 },
+    { x: 0, z: 0, width: 0.025, depth: 1 },
+    { x: -0.24, z: -0.24, width: 0.38, depth: 0.025 },
+    { x: 0.24, z: 0.24, width: 0.38, depth: 0.025 },
+    { x: -0.34, z: 0.22, width: 0.025, depth: 0.36 },
+    { x: 0.34, z: -0.22, width: 0.025, depth: 0.36 },
+  ];
+  for (const spec of lineSpecs) {
+    const line = new THREE.Mesh(new THREE.BoxGeometry(spec.width, 0.012, spec.depth), material);
+    line.position.set(spec.x, 0.152, spec.z);
+    group.add(line);
+  }
+  return group;
+}
+
 function createRoom(project) {
   const group = new THREE.Group();
   group.userData.project = project;
@@ -392,6 +430,9 @@ function createRoom(project) {
   insetFloor.receiveShadow = true;
   group.add(insetFloor);
 
+  const floorCircuits = createFloorCircuitLines(projectAccent);
+  group.add(floorCircuits);
+
   const border = new THREE.LineSegments(
     new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 0.18, 1)),
     new THREE.LineBasicMaterial({ color: projectAccent, transparent: true, opacity: gridStudio.room.borderOpacity }),
@@ -408,6 +449,15 @@ function createRoom(project) {
     }),
   );
   group.add(frontRail);
+
+  const backRail = createGlowBox(1, 0.045, 0.07, projectAccent, gridStudio.room.railOpacity);
+  group.add(backRail);
+
+  const leftRail = createGlowBox(0.07, 0.045, 1, projectAccent, gridStudio.room.railOpacity * 0.82);
+  group.add(leftRail);
+
+  const rightRail = createGlowBox(0.07, 0.045, 1, projectAccent, gridStudio.room.railOpacity * 0.82);
+  group.add(rightRail);
 
   const selectionFrameMaterial = new THREE.MeshBasicMaterial({
     color: 0x67e8f9,
@@ -548,7 +598,11 @@ function createRoom(project) {
     floorGlow,
     insetFloor,
     border,
+    floorCircuits,
     frontRail,
+    backRail,
+    leftRail,
+    rightRail,
     selectionFrame,
     selectionFrameBars,
     selectionFrameMaterial,
@@ -562,7 +616,19 @@ function createRoom(project) {
     struts,
     linkRail,
   };
-  group.userData.pickables = [floor, insetFloor, floorGlow, frontRail, backWall, sideWall, signBack, signFace];
+  group.userData.pickables = [
+    floor,
+    insetFloor,
+    floorGlow,
+    frontRail,
+    backRail,
+    leftRail,
+    rightRail,
+    backWall,
+    sideWall,
+    signBack,
+    signFace,
+  ];
   for (const pickable of group.userData.pickables) {
     pickable.userData.room = group;
     pickable.userData.project = project;
@@ -589,6 +655,13 @@ function updateRoomSize(room, layout) {
   parts.border.scale.set(width + 0.05, 1, depth + 0.05);
   parts.frontRail.scale.set(width - 0.34, 1, 1);
   parts.frontRail.position.set(0, 0.13, depth / 2 - 0.08);
+  parts.backRail.scale.set(width - 0.34, 1, 1);
+  parts.backRail.position.set(0, 0.13, -depth / 2 + 0.08);
+  parts.leftRail.scale.set(1, 1, depth - 0.34);
+  parts.leftRail.position.set(-width / 2 + 0.08, 0.13, 0);
+  parts.rightRail.scale.set(1, 1, depth - 0.34);
+  parts.rightRail.position.set(width / 2 - 0.08, 0.13, 0);
+  parts.floorCircuits.scale.set(width * 0.78, 1, depth * 0.62);
   const [frontSelectionRail, backSelectionRail, leftSelectionRail, rightSelectionRail] = parts.selectionFrameBars;
   frontSelectionRail.scale.set(width + 0.56, 1, 1);
   frontSelectionRail.position.set(0, 0.2, depth / 2 + 0.02);
@@ -965,10 +1038,13 @@ function updateRoomVisualState(room, project) {
   parts.border.material.opacity = selected
     ? gridStudio.room.selectedBorderOpacity
     : gridStudio.room.borderOpacity;
-  parts.frontRail.material.opacity = selected ? 0.9 : gridStudio.room.railOpacity;
-  parts.signBack.material.emissiveIntensity = selected ? 0.34 : 0.08;
+  parts.frontRail.material.opacity = selected ? 1 : gridStudio.room.railOpacity;
+  parts.backRail.material.opacity = selected ? 1 : gridStudio.room.railOpacity;
+  parts.leftRail.material.opacity = selected ? 0.9 : gridStudio.room.railOpacity * 0.82;
+  parts.rightRail.material.opacity = selected ? 0.9 : gridStudio.room.railOpacity * 0.82;
+  parts.signBack.material.emissiveIntensity = selected ? 0.46 : 0.14;
   parts.selectionFrame.visible = selected;
-  parts.selectionFrameMaterial.opacity = selected ? 0.82 : 0;
+  parts.selectionFrameMaterial.opacity = selected ? 0.9 : 0;
 }
 
 function updateParentVisualState(parentAgent, parentKey) {
