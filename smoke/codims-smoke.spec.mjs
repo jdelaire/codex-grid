@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 let baseUrl;
 let server;
+let unexpectedMessageRequests = [];
 
 const threadsPayload = {
   source: "codex_app_server",
@@ -182,10 +183,12 @@ test.afterAll(async () => {
 });
 
 test.beforeEach(async ({ page }) => {
+  unexpectedMessageRequests = [];
   await page.route("**/api/threads?**", async (route) => {
     await route.fulfill({ json: threadsPayload });
   });
   await page.route("**/api/thread/*/message", async (route) => {
+    unexpectedMessageRequests.push(route.request().url());
     await route.fulfill({ status: 500, body: "Unexpected smoke test message request" });
   });
   await page.route("**/api/thread/*", async (route) => {
@@ -197,6 +200,10 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+test.afterEach(() => {
+  expect(unexpectedMessageRequests).toEqual([]);
+});
+
 test("renders nonblank scene and action inbox", async ({ page }) => {
   await page.goto(`${baseUrl}/index.html`);
   await expect(page.locator("#scene canvas")).toBeVisible();
@@ -206,6 +213,9 @@ test("renders nonblank scene and action inbox", async ({ page }) => {
   await page.locator(".review-item-main").filter({ hasText: "Review sidebar" }).click();
   await expect(page.locator("#detailTitle")).toContainText("Review sidebar");
   await expect(page.locator("#threadMessageForm")).toBeHidden();
+  await expect(page.locator("#threadMessageInput")).toBeDisabled();
+  await expect(page.locator("#threadMessagePreview")).toBeDisabled();
+  await expect(page.locator("#threadMessageSubmit")).toBeDisabled();
 
   const nonBlank = await hasNonBlankScreenshot(page, page.locator("#scene canvas"));
   expect(nonBlank).toBe(true);
