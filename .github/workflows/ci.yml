@@ -23,11 +23,17 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
       - name: Run Python tests
         run: python3 -m unittest -v
 
-      - name: Check JavaScript syntax
-        run: node --check app.js
+      - name: Run JavaScript checks
+        run: npm run test:js
 
-      - name: Run visual model tests
-        run: node test_visual_model.mjs
+      - name: Run browser smoke tests
+        run: npm run test:smoke

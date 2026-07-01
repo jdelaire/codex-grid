@@ -74,8 +74,10 @@ codex app-server --listen stdio://
 
 ```bash
 python3 -m unittest -v
-node --check app.js
-node test_visual_model.mjs
+npm ci
+npx playwright install chromium
+npm run test:js
+npm run test:smoke
 ```
 
 ## API
