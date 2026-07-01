@@ -1633,7 +1633,12 @@ function renderSelectedParentTimeline() {
 }
 
 function applyThreadsPayload(payload) {
-  const searchedThreads = (payload.threads || []).filter((thread) =>
+  const fetchedThreads = filterThreadsByMaxAge(
+    payload.threads || [],
+    payload.generated_at_ms,
+    currentFetchMaxAgeHours(),
+  );
+  const searchedThreads = fetchedThreads.filter((thread) =>
     matchesThreadSearch(thread, state.search),
   );
   const visibleThreads = filterThreadsByMaxAge(
@@ -2472,7 +2477,7 @@ async function sendConfirmedThreadMessage() {
     dom.threadMessageStatus.textContent = "Sent.";
     state.detailCache.delete(thread.id);
     loadThreadDetail(thread);
-    refreshThreads();
+    refreshThreads({ force: true });
   } catch (error) {
     if (seq !== state.sendSeq || state.selectedId !== thread.id) {
       return;
