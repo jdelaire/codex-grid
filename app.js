@@ -121,8 +121,8 @@ const focusStudio = {
     floorGlowOpacity: 0.035,
     borderOpacity: 0.26,
     railOpacity: 0.3,
-    selectedGlowOpacity: 0.09,
-    selectedBorderOpacity: 0.68,
+    selectedGlowOpacity: 0.2,
+    selectedBorderOpacity: 0.96,
   },
 };
 
@@ -180,7 +180,6 @@ const state = {
   rooms: new Map(),
   parentAgents: new Map(),
   agents: new Map(),
-  roomLabels: new Map(),
   parentLabels: new Map(),
   agentLabels: new Map(),
   digestObjects: new Map(),
@@ -434,6 +433,26 @@ function createRoom(project) {
   );
   group.add(frontRail);
 
+  const selectionFrameMaterial = new THREE.MeshBasicMaterial({
+    color: 0x67e8f9,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const selectionFrame = new THREE.Group();
+  selectionFrame.visible = false;
+  const selectionFrameBars = [
+    new THREE.Mesh(new THREE.BoxGeometry(1, 0.06, 0.12), selectionFrameMaterial),
+    new THREE.Mesh(new THREE.BoxGeometry(1, 0.06, 0.12), selectionFrameMaterial),
+    new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.06, 1), selectionFrameMaterial),
+    new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.06, 1), selectionFrameMaterial),
+  ];
+  for (const bar of selectionFrameBars) {
+    selectionFrame.add(bar);
+  }
+  group.add(selectionFrame);
+
   const backWall = new THREE.Mesh(
     new THREE.BoxGeometry(1, 2.2, 0.14),
     new THREE.MeshStandardMaterial({
@@ -554,6 +573,9 @@ function createRoom(project) {
     insetFloor,
     border,
     frontRail,
+    selectionFrame,
+    selectionFrameBars,
+    selectionFrameMaterial,
     backWall,
     sideWall,
     wallPanels,
@@ -591,6 +613,15 @@ function updateRoomSize(room, layout) {
   parts.border.scale.set(width + 0.05, 1, depth + 0.05);
   parts.frontRail.scale.set(width - 0.34, 1, 1);
   parts.frontRail.position.set(0, 0.13, depth / 2 - 0.08);
+  const [frontSelectionRail, backSelectionRail, leftSelectionRail, rightSelectionRail] = parts.selectionFrameBars;
+  frontSelectionRail.scale.set(width + 0.56, 1, 1);
+  frontSelectionRail.position.set(0, 0.2, depth / 2 + 0.02);
+  backSelectionRail.scale.set(width + 0.56, 1, 1);
+  backSelectionRail.position.set(0, 0.2, -depth / 2 - 0.02);
+  leftSelectionRail.scale.set(1, 1, depth + 0.56);
+  leftSelectionRail.position.set(-width / 2 - 0.02, 0.2, 0);
+  rightSelectionRail.scale.set(1, 1, depth + 0.56);
+  rightSelectionRail.position.set(width / 2 + 0.02, 0.2, 0);
   parts.backWall.scale.set(width, 1, 1);
   parts.backWall.position.set(0, 1.05, -depth / 2 + 0.07);
   parts.sideWall.scale.set(1, 1, depth);
@@ -988,13 +1019,10 @@ function updateRoomVisualState(room, project) {
   parts.border.material.opacity = selected
     ? focusStudio.room.selectedBorderOpacity
     : focusStudio.room.borderOpacity;
-  parts.frontRail.material.opacity = selected ? 0.62 : focusStudio.room.railOpacity;
-  parts.signBack.material.emissiveIntensity = selected ? 0.16 : 0.08;
-
-  const label = state.roomLabels.get(project);
-  if (label) {
-    label.classList.toggle("is-selected", selected);
-  }
+  parts.frontRail.material.opacity = selected ? 0.9 : focusStudio.room.railOpacity;
+  parts.signBack.material.emissiveIntensity = selected ? 0.34 : 0.08;
+  parts.selectionFrame.visible = selected;
+  parts.selectionFrameMaterial.opacity = selected ? 0.82 : 0;
 }
 
 function updateParentVisualState(parentAgent, parentKey) {
@@ -1073,11 +1101,6 @@ function reconcileRooms(projectGroups) {
       disposeObject3D(room);
       scene.remove(room);
       state.rooms.delete(project);
-      const label = state.roomLabels.get(project);
-      if (label) {
-        label.remove();
-        state.roomLabels.delete(project);
-      }
     }
   }
 
@@ -1089,15 +1112,9 @@ function reconcileRooms(projectGroups) {
       room = createRoom(project);
       state.rooms.set(project, room);
     }
-    if (!state.roomLabels.has(project)) {
-      state.roomLabels.set(project, createLabel("room-label"));
-    }
     room.position.copy(roomPosition(index, projectGroups.length, roomSpacing.gapX, roomSpacing.gapZ));
     room.userData.layout = layout;
     updateRoomSize(room, layout);
-    const roomLabel = state.roomLabels.get(project);
-    roomLabel.textContent = projectDisplayText(privacyLabel(project, state.privacy), threads.length);
-    roomLabel.dataset.project = project;
     const display = room.userData.projectDisplay;
     if (
       display &&
@@ -2093,18 +2110,6 @@ function updateLabels() {
   const height = dom.scene.clientHeight;
   const vector = new THREE.Vector3();
 
-  for (const [project, label] of state.roomLabels.entries()) {
-    const room = state.rooms.get(project);
-    if (!room) {
-      continue;
-    }
-    room.userData.parts.signBack.getWorldPosition(vector);
-    vector.y += 0.72;
-    vector.project(camera);
-    label.style.left = `${(vector.x * 0.5 + 0.5) * width}px`;
-    label.style.top = `${(-vector.y * 0.5 + 0.5) * height}px`;
-  }
-
   for (const [parentKey, label] of state.parentLabels.entries()) {
     const parentAgent = state.parentAgents.get(parentKey);
     if (!parentAgent) {
@@ -2138,16 +2143,6 @@ function updateLabels() {
     label.style.top = `${(-vector.y * 0.5 + 0.5) * height}px`;
   }
 
-  for (const [project, label] of state.roomLabels.entries()) {
-    const signFace = state.rooms.get(project)?.userData.parts?.signFace;
-    if (!signFace) {
-      continue;
-    }
-    signFace.getWorldPosition(vector);
-    vector.project(camera);
-    label.style.left = `${(vector.x * 0.5 + 0.5) * width}px`;
-    label.style.top = `${(-vector.y * 0.5 + 0.5) * height}px`;
-  }
 }
 
 function animateAgents(elapsed) {
@@ -2280,13 +2275,6 @@ function updatePrivacySensitiveUi() {
     if (display) {
       updateProjectDisplayTexture(display.texture, display.project, display.count, state.privacy);
       display.privacy = state.privacy;
-      const roomLabel = state.roomLabels.get(display.project);
-      if (roomLabel) {
-        roomLabel.textContent = projectDisplayText(
-          privacyLabel(display.project, state.privacy),
-          display.count,
-        );
-      }
     }
   }
 

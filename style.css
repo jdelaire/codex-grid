@@ -341,8 +341,7 @@ h1::before {
 
 .agent-label,
 .digest-label,
-.parent-label,
-.room-label {
+.parent-label {
   position: absolute;
   z-index: 2;
   transform: translate(-50%, -100%);
@@ -371,24 +370,6 @@ h1::before {
   font-size: 13px;
   font-weight: 760;
   text-align: center;
-  white-space: normal;
-}
-
-.room-label {
-  z-index: 6;
-  transform: translate(-50%, -50%);
-  min-width: 190px;
-  max-width: 300px;
-  padding: 9px 12px;
-  color: #cbd5e1;
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(8, 13, 24, 0.92));
-  border-color: rgba(125, 211, 252, 0.44);
-  box-shadow: 0 0 0 1px rgba(125, 211, 252, 0.08) inset, 0 0 16px rgba(125, 211, 252, 0.1);
-  font-size: 18px;
-  font-weight: 760;
-  line-height: 1.08;
-  text-align: center;
-  text-transform: uppercase;
   white-space: normal;
 }
 
@@ -453,8 +434,7 @@ h1::before {
 
 .agent-label.is-selected,
 .digest-label.is-selected,
-.parent-label.is-selected,
-.room-label.is-selected {
+.parent-label.is-selected {
   opacity: 1;
   border-color: rgba(224, 242, 254, 0.82);
   background: rgba(8, 13, 24, 0.9);
