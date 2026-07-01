@@ -185,8 +185,11 @@ test.beforeEach(async ({ page }) => {
   await page.route("**/api/threads?**", async (route) => {
     await route.fulfill({ json: threadsPayload });
   });
+  await page.route("**/api/thread/*/message", async (route) => {
+    await route.fulfill({ status: 500, body: "Unexpected smoke test message request" });
+  });
   await page.route("**/api/thread/*", async (route) => {
-    if (route.request().method() !== "GET" || route.request().url().includes("/message")) {
+    if (route.request().method() !== "GET") {
       await route.fulfill({ status: 500, body: "Unexpected smoke test message request" });
       return;
     }
@@ -200,6 +203,8 @@ test("renders nonblank scene and action inbox", async ({ page }) => {
   await expect(page.locator("#activeCount")).toHaveText("1");
   await expect(page.locator("#visibleCount")).toHaveText("3");
   await expect(page.locator("#reviewList")).toContainText("Review sidebar");
+  await page.locator(".review-item-main").filter({ hasText: "Review sidebar" }).click();
+  await expect(page.locator("#detailTitle")).toContainText("Review sidebar");
   await expect(page.locator("#threadMessageForm")).toBeHidden();
 
   const nonBlank = await hasNonBlankScreenshot(page, page.locator("#scene canvas"));
