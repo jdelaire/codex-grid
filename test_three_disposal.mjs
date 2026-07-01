@@ -30,3 +30,5 @@ const object = {
 
 disposeObject3D(object);
 assert.equal(objectDisposed, 4);
+
+assert.throws(() => disposeMaterial({}), TypeError);

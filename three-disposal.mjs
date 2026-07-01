@@ -5,10 +5,10 @@ export function disposeMaterial(material) {
     }
     return;
   }
-  if (material?.map) {
-    material.map.dispose();
-  }
-  if (material?.dispose) {
+  if (material) {
+    if (material.map) {
+      material.map.dispose();
+    }
     material.dispose();
   }
 }
