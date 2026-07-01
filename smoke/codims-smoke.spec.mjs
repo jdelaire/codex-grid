@@ -216,6 +216,19 @@ test("renders nonblank scene and action inbox", async ({ page }) => {
   await expect(page.locator("#projectCount")).toHaveText("1");
   await expect(page.locator("#inboxToggle")).toBeVisible();
   await expect(page.locator("#settingsToggle")).toBeVisible();
+  const themeTokens = await page.evaluate(() => {
+    const styles = getComputedStyle(document.documentElement);
+    return {
+      bg: styles.getPropertyValue("--bg").trim(),
+      accent: styles.getPropertyValue("--accent").trim(),
+      warn: styles.getPropertyValue("--warn").trim(),
+    };
+  });
+  expect(themeTokens).toEqual({
+    bg: "#02040a",
+    accent: "#00e5ff",
+    warn: "#ff8a00",
+  });
   await expect(page.locator("#inboxBadge")).toHaveText("2");
   await expect(page.locator("#inboxToggle")).toHaveAttribute("aria-label", "2 items need review");
   await expect(page.locator("#inboxDrawer")).toBeHidden();
