@@ -75,7 +75,7 @@ codex app-server --listen stdio://
 ```bash
 python3 -m unittest -v
 npm ci
-npx playwright install chromium
+npx playwright install --with-deps chromium
 npm run test:js
 npm run test:smoke
 ```

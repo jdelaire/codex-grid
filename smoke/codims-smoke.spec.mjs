@@ -1,10 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { spawn } from "node:child_process";
-import { setTimeout as delay } from "node:timers/promises";
+import { readFile } from "node:fs/promises";
+import { createServer } from "node:http";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const port = 9876;
-const baseUrl = `http://127.0.0.1:${port}`;
-let serverProcess;
+let baseUrl;
+let server;
 
 const threadsPayload = {
   source: "codex_app_server",
@@ -80,18 +81,39 @@ const threadDetailPayload = {
   },
 };
 
-async function waitForServer() {
-  for (let attempt = 0; attempt < 50; attempt += 1) {
+function contentTypeFor(filePath) {
+  if (filePath.endsWith(".html")) {
+    return "text/html; charset=utf-8";
+  }
+  if (filePath.endsWith(".css")) {
+    return "text/css; charset=utf-8";
+  }
+  if (filePath.endsWith(".js") || filePath.endsWith(".mjs")) {
+    return "text/javascript; charset=utf-8";
+  }
+  return "application/octet-stream";
+}
+
+function createStaticServer(root) {
+  return createServer(async (request, response) => {
     try {
-      const response = await fetch(`${baseUrl}/index.html`);
-      if (response.ok) {
+      const requestUrl = new URL(request.url || "/", "http://127.0.0.1");
+      const pathname = requestUrl.pathname === "/" ? "/index.html" : requestUrl.pathname;
+      const relativePath = decodeURIComponent(pathname).replace(/^\/+/, "");
+      const filePath = path.resolve(root, relativePath);
+
+      if (!filePath.startsWith(`${root}${path.sep}`)) {
+        response.writeHead(404).end();
         return;
       }
+
+      const body = await readFile(filePath);
+      response.writeHead(200, { "content-type": contentTypeFor(filePath) });
+      response.end(body);
     } catch {
-      await delay(100);
+      response.writeHead(404).end();
     }
-  }
-  throw new Error("static smoke server did not start");
+  });
 }
 
 async function hasNonBlankScreenshot(page, locator) {
@@ -111,39 +133,51 @@ async function hasNonBlankScreenshot(page, locator) {
     }
 
     context.drawImage(image, 0, 0);
-    const samples = [
-      [0.5, 0.5],
-      [0.25, 0.5],
-      [0.75, 0.5],
-      [0.5, 0.25],
-      [0.5, 0.75],
-    ];
-    for (const [x, y] of samples) {
-      const pixel = context.getImageData(
-        Math.floor(sampler.width * x),
-        Math.floor(sampler.height * y),
-        1,
-        1,
-      ).data;
-      if (pixel[0] + pixel[1] + pixel[2] > 16) {
-        return true;
+    const background = [4, 6, 13];
+    let minLuminance = Infinity;
+    let maxLuminance = -Infinity;
+    let maxBackgroundDistance = 0;
+
+    for (let y = 1; y <= 9; y += 1) {
+      for (let x = 1; x <= 9; x += 1) {
+        const pixel = context.getImageData(
+          Math.floor((sampler.width * x) / 10),
+          Math.floor((sampler.height * y) / 10),
+          1,
+          1,
+        ).data;
+        const luminance = 0.2126 * pixel[0] + 0.7152 * pixel[1] + 0.0722 * pixel[2];
+        minLuminance = Math.min(minLuminance, luminance);
+        maxLuminance = Math.max(maxLuminance, luminance);
+
+        const backgroundDistance = Math.hypot(
+          pixel[0] - background[0],
+          pixel[1] - background[1],
+          pixel[2] - background[2],
+        );
+        maxBackgroundDistance = Math.max(maxBackgroundDistance, backgroundDistance);
+
+        if (backgroundDistance > 45) {
+          return true;
+        }
       }
     }
-    return false;
+    return maxLuminance - minLuminance > 35 && maxBackgroundDistance > 25;
   }, dataUrl);
 }
 
 test.beforeAll(async () => {
-  serverProcess = spawn("python3", ["-m", "http.server", String(port), "--bind", "127.0.0.1"], {
-    cwd: process.cwd(),
-    stdio: "ignore",
+  const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
+  server = createStaticServer(root);
+  await new Promise((resolve) => {
+    server.listen(0, "127.0.0.1", resolve);
   });
-  await waitForServer();
+  baseUrl = `http://127.0.0.1:${server.address().port}`;
 });
 
 test.afterAll(async () => {
-  if (serverProcess) {
-    serverProcess.kill();
+  if (server) {
+    await new Promise((resolve) => server.close(resolve));
   }
 });
 
@@ -152,6 +186,10 @@ test.beforeEach(async ({ page }) => {
     await route.fulfill({ json: threadsPayload });
   });
   await page.route("**/api/thread/*", async (route) => {
+    if (route.request().method() !== "GET" || route.request().url().includes("/message")) {
+      await route.fulfill({ status: 500, body: "Unexpected smoke test message request" });
+      return;
+    }
     await route.fulfill({ json: threadDetailPayload });
   });
 });
@@ -162,6 +200,7 @@ test("renders nonblank scene and action inbox", async ({ page }) => {
   await expect(page.locator("#activeCount")).toHaveText("1");
   await expect(page.locator("#visibleCount")).toHaveText("3");
   await expect(page.locator("#reviewList")).toContainText("Review sidebar");
+  await expect(page.locator("#threadMessageForm")).toBeHidden();
 
   const nonBlank = await hasNonBlankScreenshot(page, page.locator("#scene canvas"));
   expect(nonBlank).toBe(true);
