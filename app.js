@@ -125,6 +125,7 @@ const gridStudio = {
 const PREFS_KEY = "codims.preferences.v1";
 const REVIEWED_THREADS_KEY = "codims.reviewedThreads.v1";
 const SELECTED_LABEL_BORDER = "rgba(224, 242, 254, 0.82)";
+const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 function loadPreferences() {
   try {
@@ -187,6 +188,7 @@ const state = {
   refreshing: false,
   cameraFocus: null,
   hasInitialCameraFocus: false,
+  reducedMotion: reducedMotionQuery.matches,
   selectable: [],
   refreshSeq: 0,
 };
@@ -2238,6 +2240,15 @@ function animateAgents(elapsed) {
       parentKey: parentGroup?.key || parentAgent.userData.parentKey,
       threadId: parentGroup?.lead?.id,
     });
+    if (state.reducedMotion) {
+      parentAgent.position.y = 0;
+      parts.head.rotation.z = 0;
+      parts.ring.scale.setScalar(1);
+      parts.core.scale.setScalar(1);
+      parts.disc.rotation.z = 0;
+      parts.disc.scale.setScalar(selected ? 1.16 : 1);
+      continue;
+    }
     parentAgent.position.y = Math.sin(elapsed * speed + hashString(parentGroup?.parentId || "")) * (parentGroup?.isActive ? 0.05 : 0.008);
     parts.head.rotation.z = Math.sin(elapsed * speed) * (parentGroup?.isActive ? 0.04 : 0.01);
     parts.ring.scale.setScalar(1 + Math.sin(elapsed * speed) * (parentGroup?.isActive ? 0.08 : 0.012));
@@ -2253,6 +2264,10 @@ function animateAgents(elapsed) {
       parts.packet.visible = false;
       continue;
     }
+    if (state.reducedMotion) {
+      parts.packet.visible = false;
+      continue;
+    }
     const curve = handoff.userData.curve;
     const phase = (elapsed * 0.85 + (hashString(handoff.uuid) % 100) / 100) % 1;
     parts.packet.visible = true;
@@ -2264,6 +2279,14 @@ function animateAgents(elapsed) {
     const thread = agent.userData.thread;
     const parts = agent.userData.parts;
     const selected = selectedSceneObject({ type: "agent", threadId: thread.id });
+    if (state.reducedMotion) {
+      const statusLightScale = selected ? 1.08 : thread.state === "DONE" ? 0.92 : 1;
+      agent.position.y = 0;
+      parts.head.rotation.z = 0;
+      parts.ring.scale.setScalar(selected ? 1.12 : 1);
+      parts.statusLight.scale.setScalar(statusLightScale);
+      continue;
+    }
     if (thread.state === "ACTIVE") {
       const speed = thread.intensity === "energetic" ? 5.8 : 3.4;
       const pulse = Math.sin(elapsed * speed) * 0.08;
@@ -2287,21 +2310,24 @@ function animateAgents(elapsed) {
 
   for (const digestObject of state.digestObjects.values()) {
     const parts = digestObject.userData.parts;
+    const selected = selectedSceneObject({
+      type: "digest",
+      digestKey: digestObject.userData.digestKey,
+    });
+    if (state.reducedMotion) {
+      const inactiveOpacity = selected ? 0.24 : 0.12;
+      parts.token.rotation.y = 0;
+      parts.ring.scale.setScalar(selected ? 1.12 : 1);
+      parts.ringMaterial.opacity = digestObject.userData.doneObjectInactive ? inactiveOpacity : 0.46;
+      continue;
+    }
     if (digestObject.userData.doneObjectInactive) {
-      const selected = selectedSceneObject({
-        type: "digest",
-        digestKey: digestObject.userData.digestKey,
-      });
       parts.token.rotation.y = 0;
       parts.ring.scale.setScalar(selected ? 1.12 : 1);
       parts.ringMaterial.opacity = selected ? 0.24 : 0.12;
       continue;
     }
     const pulse = 1 + Math.sin(elapsed * 1.7 + hashString(digestObject.userData.digestKey || "")) * 0.035;
-    const selected = selectedSceneObject({
-      type: "digest",
-      digestKey: digestObject.userData.digestKey,
-    });
     parts.token.rotation.y = elapsed * 0.28;
     parts.ring.scale.setScalar(selected ? Math.max(1.12, pulse) : pulse);
     parts.ringMaterial.opacity = 0.46;
@@ -2400,6 +2426,10 @@ function setInspectorOpen(nextOpen) {
 
 function bindEvents() {
   window.addEventListener("resize", resize);
+  reducedMotionQuery.addEventListener("change", (event) => {
+    state.reducedMotion = event.matches;
+    updateSceneVisualStates();
+  });
   renderer.domElement.addEventListener("pointerdown", onPointerDown);
   renderer.domElement.addEventListener("pointerup", onPointerUp);
   renderer.domElement.addEventListener("pointercancel", onPointerCancel);

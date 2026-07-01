@@ -167,6 +167,52 @@ async function hasNonBlankScreenshot(page, locator) {
   }, dataUrl);
 }
 
+async function screenshotDifferenceRatio(page, beforePng, afterPng) {
+  const beforeUrl = `data:image/png;base64,${beforePng.toString("base64")}`;
+  const afterUrl = `data:image/png;base64,${afterPng.toString("base64")}`;
+  return page.evaluate(
+    async ({ beforeUrl, afterUrl }) => {
+      const loadImage = async (url) => {
+        const image = new Image();
+        image.src = url;
+        await image.decode();
+        return image;
+      };
+      const [beforeImage, afterImage] = await Promise.all([
+        loadImage(beforeUrl),
+        loadImage(afterUrl),
+      ]);
+      const width = Math.min(beforeImage.width, afterImage.width);
+      const height = Math.min(beforeImage.height, afterImage.height);
+      const sampler = document.createElement("canvas");
+      sampler.width = width;
+      sampler.height = height;
+      const context = sampler.getContext("2d");
+      if (!context) {
+        return 1;
+      }
+
+      context.drawImage(beforeImage, 0, 0);
+      const before = context.getImageData(0, 0, width, height).data;
+      context.clearRect(0, 0, width, height);
+      context.drawImage(afterImage, 0, 0);
+      const after = context.getImageData(0, 0, width, height).data;
+      let changed = 0;
+      for (let index = 0; index < before.length; index += 4) {
+        const delta =
+          Math.abs(before[index] - after[index]) +
+          Math.abs(before[index + 1] - after[index + 1]) +
+          Math.abs(before[index + 2] - after[index + 2]);
+        if (delta > 18) {
+          changed += 1;
+        }
+      }
+      return changed / (width * height);
+    },
+    { beforeUrl, afterUrl },
+  );
+}
+
 test.beforeAll(async () => {
   const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
   server = createStaticServer(root);
@@ -322,6 +368,17 @@ test("settings overlay controls privacy and idle filters", async ({ page }) => {
   await page.goto(`${baseUrl}/index.html`);
   await page.locator("#settingsToggle").click();
   await expect(page.locator("#settingsDialog")).toBeVisible();
+  const settingsChrome = await page.locator("#settingsDialog").evaluate((dialog) => {
+    const styles = getComputedStyle(dialog);
+    return {
+      backgroundImage: styles.backgroundImage,
+      borderColor: styles.borderTopColor,
+      boxShadow: styles.boxShadow,
+    };
+  });
+  expect(settingsChrome.borderColor).toBe("rgba(0, 229, 255, 0.34)");
+  expect(settingsChrome.backgroundImage).toContain("linear-gradient");
+  expect(settingsChrome.boxShadow).toContain("rgba(0, 229, 255");
   await expect(page.locator("#maxAgeHours")).toHaveValue("8");
   await page.locator("#privacyToggle").click();
   await expect
@@ -376,4 +433,18 @@ test("mobile layout keeps scene and inspector details available", async ({ page 
   await page.locator("#inspectorClose").click();
   await page.locator("#settingsToggle").click();
   await expect(page.locator("#settingsDialog")).toBeVisible();
+});
+
+test("reduced motion keeps scene animation static", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto(`${baseUrl}/index.html`);
+  await expect(page.locator("#scene canvas")).toBeVisible();
+  await expect(page.locator("#activeCount")).toHaveText("1");
+  await page.waitForTimeout(1200);
+  const canvas = page.locator("#scene canvas");
+  const before = await canvas.screenshot();
+  await page.waitForTimeout(800);
+  const after = await canvas.screenshot();
+  const differenceRatio = await screenshotDifferenceRatio(page, before, after);
+  expect(differenceRatio).toBeLessThan(0.0005);
 });
