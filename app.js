@@ -80,41 +80,45 @@ const dom = {
 };
 
 const parentPalette = [
-  0x36cfc9,
-  0xf59e0b,
-  0xa78bfa,
-  0x60a5fa,
-  0xf472b6,
-  0x84cc16,
-  0xf87171,
-  0x22d3ee,
-  0xfbbf24,
-  0x38bdf8,
+  0x00e5ff,
+  0x2fffd0,
+  0xff8a00,
+  0xff3df2,
+  0x8b5cf6,
+  0x7df9ff,
+  0xffc857,
+  0x39ff88,
+  0x5cc8ff,
+  0xff5a3d,
 ];
 
-const focusStudio = {
-  sceneBackground: 0x04060d,
-  ambientSky: 0xb8d7f2,
-  ambientGround: 0x111827,
-  gridCenter: 0x1d283a,
-  gridLine: 0x0b1220,
-  active: 0x34d399,
-  done: 0xd97706,
-  digest: 0xf59e0b,
-  reviewed: 0x64748b,
+const gridStudio = {
+  sceneBackground: 0x02040a,
+  ambientSky: 0x5cc8ff,
+  ambientGround: 0x02040a,
+  gridCenter: 0x00364a,
+  gridLine: 0x00151f,
+  active: 0x2fffd0,
+  done: 0xff8a00,
+  digest: 0xff8a00,
+  reviewed: 0x4b6470,
+  cyan: 0x00e5ff,
+  cyanSoft: 0x1ea7c6,
+  panelBlack: 0x020813,
+  panelDeep: 0x010409,
   room: {
-    floor: 0x101827,
-    insetFloor: 0x182235,
-    wallPanel: 0x172033,
-    accentShadow: 0x06111f,
-    backWall: 0x121a29,
-    sideWall: 0x0b1220,
-    signBack: 0x07101d,
-    floorGlowOpacity: 0.035,
-    borderOpacity: 0.26,
-    railOpacity: 0.3,
-    selectedGlowOpacity: 0.2,
-    selectedBorderOpacity: 0.96,
+    floor: 0x020813,
+    insetFloor: 0x031522,
+    wallPanel: 0x04111b,
+    accentShadow: 0x00131d,
+    backWall: 0x030c14,
+    sideWall: 0x020812,
+    signBack: 0x01070d,
+    floorGlowOpacity: 0.08,
+    borderOpacity: 0.56,
+    railOpacity: 0.68,
+    selectedGlowOpacity: 0.28,
+    selectedBorderOpacity: 1,
   },
 };
 
@@ -204,7 +208,7 @@ function savePreferences() {
 }
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(focusStudio.sceneBackground);
+scene.background = new THREE.Color(gridStudio.sceneBackground);
 
 const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 1000);
 camera.position.set(10, 10, 14);
@@ -213,7 +217,7 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1;
+renderer.toneMappingExposure = 1.08;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 dom.scene.appendChild(renderer.domElement);
@@ -228,20 +232,20 @@ const clock = new THREE.Clock();
 const CLICK_MOVE_LIMIT_PX = 6;
 let pendingPointerPick = null;
 
-const ambient = new THREE.HemisphereLight(focusStudio.ambientSky, focusStudio.ambientGround, 1.65);
+const ambient = new THREE.HemisphereLight(gridStudio.ambientSky, gridStudio.ambientGround, 1.25);
 scene.add(ambient);
 
-const keyLight = new THREE.DirectionalLight(0xffffff, 2.35);
+const keyLight = new THREE.DirectionalLight(0x9ff7ff, 2.1);
 keyLight.position.set(9, 16, 7);
 keyLight.castShadow = true;
 keyLight.shadow.mapSize.set(2048, 2048);
 scene.add(keyLight);
 
-const rimLight = new THREE.DirectionalLight(0x7dd3fc, 0.48);
+const rimLight = new THREE.DirectionalLight(0x00e5ff, 0.72);
 rimLight.position.set(-10, 8, -6);
 scene.add(rimLight);
 
-const grid = new THREE.GridHelper(240, 240, focusStudio.gridCenter, focusStudio.gridLine);
+const grid = new THREE.GridHelper(240, 240, gridStudio.gridCenter, gridStudio.gridLine);
 grid.position.y = -0.03;
 scene.add(grid);
 
@@ -327,15 +331,15 @@ function updateProjectDisplayTexture(texture, project, count, privacyMode = fals
   const ctx = canvas.getContext("2d");
   const text = projectDisplayText(privacyLabel(project, privacyMode), count);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = "rgba(5, 10, 20, 0.98)";
-  drawRoundedRect(ctx, 22, 24, canvas.width - 44, canvas.height - 48, 34);
+  ctx.fillStyle = "rgba(1, 6, 12, 0.98)";
+  drawRoundedRect(ctx, 22, 24, canvas.width - 44, canvas.height - 48, 22);
   ctx.fill();
-  ctx.lineWidth = 10;
-  ctx.strokeStyle = "rgba(125, 211, 252, 0.48)";
+  ctx.lineWidth = 8;
+  ctx.strokeStyle = "rgba(0, 229, 255, 0.72)";
   ctx.stroke();
-  ctx.shadowColor = "rgba(125, 211, 252, 0.36)";
-  ctx.shadowBlur = 14;
-  ctx.fillStyle = "#e5eef8";
+  ctx.shadowColor = "rgba(0, 229, 255, 0.78)";
+  ctx.shadowBlur = 18;
+  ctx.fillStyle = "#eaffff";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   const fontSize = fitProjectDisplayFont(ctx, text, canvas.width - 140);
@@ -353,7 +357,7 @@ function createRoom(project) {
   const floor = new THREE.Mesh(
     new THREE.BoxGeometry(1, 0.16, 1),
     new THREE.MeshStandardMaterial({
-      color: focusStudio.room.floor,
+      color: gridStudio.room.floor,
       roughness: 0.68,
       metalness: 0.08,
     }),
@@ -366,7 +370,7 @@ function createRoom(project) {
     new THREE.MeshBasicMaterial({
       color: projectAccent,
       transparent: true,
-      opacity: focusStudio.room.floorGlowOpacity,
+      opacity: gridStudio.room.floorGlowOpacity,
       depthWrite: false,
     }),
   );
@@ -377,7 +381,7 @@ function createRoom(project) {
   const insetFloor = new THREE.Mesh(
     new THREE.BoxGeometry(1, 0.05, 1),
     new THREE.MeshStandardMaterial({
-      color: focusStudio.room.insetFloor,
+      color: gridStudio.room.insetFloor,
       roughness: 0.58,
       metalness: 0.14,
       emissive: projectAccent,
@@ -390,7 +394,7 @@ function createRoom(project) {
 
   const border = new THREE.LineSegments(
     new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 0.18, 1)),
-    new THREE.LineBasicMaterial({ color: projectAccent, transparent: true, opacity: focusStudio.room.borderOpacity }),
+    new THREE.LineBasicMaterial({ color: projectAccent, transparent: true, opacity: gridStudio.room.borderOpacity }),
   );
   border.position.y = 0.02;
   group.add(border);
@@ -400,7 +404,7 @@ function createRoom(project) {
     new THREE.MeshBasicMaterial({
       color: projectAccent,
       transparent: true,
-      opacity: focusStudio.room.railOpacity,
+      opacity: gridStudio.room.railOpacity,
     }),
   );
   group.add(frontRail);
@@ -428,7 +432,7 @@ function createRoom(project) {
   const backWall = new THREE.Mesh(
     new THREE.BoxGeometry(1, 2.2, 0.14),
     new THREE.MeshStandardMaterial({
-      color: focusStudio.room.backWall,
+      color: gridStudio.room.backWall,
       roughness: 0.78,
       metalness: 0.04,
       emissive: projectAccent,
@@ -442,7 +446,7 @@ function createRoom(project) {
   const sideWall = new THREE.Mesh(
     new THREE.BoxGeometry(0.14, 2.2, 1),
     new THREE.MeshStandardMaterial({
-      color: focusStudio.room.sideWall,
+      color: gridStudio.room.sideWall,
       roughness: 0.8,
       metalness: 0.04,
       emissive: projectAccent,
@@ -455,7 +459,7 @@ function createRoom(project) {
 
   const wallPanels = [];
   const wallPanelMaterial = new THREE.MeshStandardMaterial({
-    color: focusStudio.room.wallPanel,
+    color: gridStudio.room.wallPanel,
     roughness: 0.74,
     metalness: 0.08,
     emissive: projectAccent,
@@ -492,7 +496,7 @@ function createRoom(project) {
   const signBack = new THREE.Mesh(
     new THREE.BoxGeometry(5.25, 1.28, 0.16),
     new THREE.MeshStandardMaterial({
-      color: focusStudio.room.signBack,
+      color: gridStudio.room.signBack,
       emissive: 0x0b2a35,
       emissiveIntensity: 0.08,
       roughness: 0.52,
@@ -627,10 +631,10 @@ function createLabel(className) {
 
 function agentGlowForState(thread) {
   if (thread.state === "ACTIVE") {
-    return { color: focusStudio.active, opacity: 0.5 };
+    return { color: gridStudio.active, opacity: 0.5 };
   }
   if (thread.state === "DONE") {
-    return { color: focusStudio.done, opacity: 0.18 };
+    return { color: gridStudio.done, opacity: 0.18 };
   }
   return { color: 0x475569, opacity: 0.08 };
 }
@@ -662,7 +666,7 @@ function createParentAgent(parentGroup) {
     emissiveIntensity: 0.025,
   });
   const glowMaterial = new THREE.MeshBasicMaterial({
-    color: parentGroup.isActive ? focusStudio.active : color,
+    color: parentGroup.isActive ? gridStudio.active : color,
     transparent: true,
     opacity: parentGroup.isActive ? 0.56 : 0.16,
   });
@@ -784,10 +788,10 @@ function createDigestObject(parentGroup) {
     emissiveIntensity: 0.1,
   });
   const tokenMaterial = new THREE.MeshStandardMaterial({
-    color: focusStudio.digest,
+    color: gridStudio.digest,
     roughness: 0.42,
     metalness: 0.18,
-    emissive: focusStudio.digest,
+    emissive: gridStudio.digest,
     emissiveIntensity: 0.14,
   });
   const ringMaterial = new THREE.MeshBasicMaterial({
@@ -826,8 +830,8 @@ function updateDigestObjectReviewState(digestObject, reviewState) {
   parts.baseMaterial.color.setHex(inactive ? 0x1f2937 : 0x78350f);
   parts.baseMaterial.emissive.setHex(inactive ? 0x000000 : 0x451a03);
   parts.baseMaterial.emissiveIntensity = inactive ? 0 : 0.1;
-  parts.tokenMaterial.color.setHex(inactive ? focusStudio.reviewed : focusStudio.digest);
-  parts.tokenMaterial.emissive.setHex(inactive ? 0x000000 : focusStudio.digest);
+  parts.tokenMaterial.color.setHex(inactive ? gridStudio.reviewed : gridStudio.digest);
+  parts.tokenMaterial.emissive.setHex(inactive ? 0x000000 : gridStudio.digest);
   parts.tokenMaterial.emissiveIntensity = inactive ? 0 : 0.14;
   parts.ringMaterial.color.setHex(inactive ? 0x94a3b8 : 0xfbbf24);
   parts.ringMaterial.opacity = inactive ? 0.1 : 0.34;
@@ -956,12 +960,12 @@ function updateRoomVisualState(room, project) {
   const selected = selectedSceneObject({ type: "room", project });
   const parts = room.userData.parts;
   parts.floorGlow.material.opacity = selected
-    ? focusStudio.room.selectedGlowOpacity
-    : focusStudio.room.floorGlowOpacity;
+    ? gridStudio.room.selectedGlowOpacity
+    : gridStudio.room.floorGlowOpacity;
   parts.border.material.opacity = selected
-    ? focusStudio.room.selectedBorderOpacity
-    : focusStudio.room.borderOpacity;
-  parts.frontRail.material.opacity = selected ? 0.9 : focusStudio.room.railOpacity;
+    ? gridStudio.room.selectedBorderOpacity
+    : gridStudio.room.borderOpacity;
+  parts.frontRail.material.opacity = selected ? 0.9 : gridStudio.room.railOpacity;
   parts.signBack.material.emissiveIntensity = selected ? 0.34 : 0.08;
   parts.selectionFrame.visible = selected;
   parts.selectionFrameMaterial.opacity = selected ? 0.82 : 0;
@@ -1153,7 +1157,7 @@ function reconcileAgents(projectGroups) {
       parentParts.bodyMaterial.color.setHex(parentColorHex);
       parentParts.bodyMaterial.emissive.setHex(parentGroup.isActive ? parentColorHex : 0x000000);
       parentParts.bodyMaterial.emissiveIntensity = parentGroup.isActive ? 0.1 : 0;
-      parentParts.glowMaterial.color.setHex(parentGroup.isActive ? focusStudio.active : parentColorHex);
+      parentParts.glowMaterial.color.setHex(parentGroup.isActive ? gridStudio.active : parentColorHex);
       parentParts.glowMaterial.opacity = parentGroup.isActive ? 0.56 : 0.16;
       parentParts.body.userData.threadId = parentGroup.lead.id;
       parentParts.body.userData.thread = parentGroup.lead;
