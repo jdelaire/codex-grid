@@ -21,7 +21,6 @@ import {
   parentGroupOffset,
   parseReviewedThreadIds,
   privacyLabel,
-  privacyPath,
   projectDisplayText,
   projectRoomGridSpacing,
   projectRoomLayout,
@@ -71,12 +70,13 @@ const dom = {
   detailRole: document.querySelector("#detailRole"),
   detailProject: document.querySelector("#detailProject"),
   detailAge: document.querySelector("#detailAge"),
-  detailTitle: document.querySelector("#detailTitle"),
+  detailAgentPromptLabel: document.querySelector("#detailAgentPromptLabel"),
+  detailAgentPrompt: document.querySelector("#detailAgentPrompt"),
+  detailLastResponseLabel: document.querySelector("#detailLastResponseLabel"),
+  detailLastResponse: document.querySelector("#detailLastResponse"),
   detailThreadContentLabel: document.querySelector("#detailThreadContentLabel"),
   detailThreadContent: document.querySelector("#detailThreadContent"),
   detailParent: document.querySelector("#detailParent"),
-  detailCwd: document.querySelector("#detailCwd"),
-  detailId: document.querySelector("#detailId"),
 };
 
 const parentPalette = [
@@ -1733,6 +1733,15 @@ function showRoomFocus(room) {
   updateSceneVisualStates();
 }
 
+function setDetailThreadBoxesVisible(visible) {
+  dom.detailAgentPromptLabel.hidden = !visible;
+  dom.detailAgentPrompt.hidden = !visible;
+  dom.detailLastResponseLabel.hidden = !visible;
+  dom.detailLastResponse.hidden = !visible;
+  dom.detailThreadContentLabel.hidden = visible;
+  dom.detailThreadContent.hidden = visible;
+}
+
 function renderDetails(thread, parentGroup = null) {
   const timelineParentGroup = parentGroup || findParentGroupByKey(state.selectedParentKey);
   const shouldRenderTimeline = Boolean(
@@ -1750,19 +1759,26 @@ function renderDetails(thread, parentGroup = null) {
   dom.detailRole.textContent = thread.role || "thread";
   dom.detailProject.textContent = privacyLabel(thread.project || "unknown", state.privacy);
   dom.detailAge.textContent = formatAge(thread.age_seconds);
-  dom.detailTitle.textContent = privacyLabel(thread.title || "(untitled)", state.privacy);
   if (shouldRenderTimeline) {
+    setDetailThreadBoxesVisible(false);
     dom.detailThreadContentLabel.textContent = "Parent timeline";
     renderParentTimeline(timelineParentGroup);
   } else {
-    dom.detailThreadContentLabel.textContent = "Agent prompt + last response";
+    setDetailThreadBoxesVisible(true);
     const cached = state.detailCache.get(thread.id);
-    const detailContent = cached ? cached.content || "(no loaded thread content)" : "Loading thread content...";
-    dom.detailThreadContent.textContent = state.privacy ? "Hidden" : detailContent;
+    const loadingText = "Loading thread content...";
+    dom.detailAgentPrompt.textContent = state.privacy
+      ? "Hidden"
+      : cached
+        ? cached.agent_prompt || "(no agent prompt captured)"
+        : loadingText;
+    dom.detailLastResponse.textContent = state.privacy
+      ? "Hidden"
+      : cached
+        ? cached.last_response || "(no last response captured)"
+        : loadingText;
   }
   dom.detailParent.textContent = privacyLabel(thread.parent_title || "(none)", state.privacy);
-  dom.detailCwd.textContent = privacyPath(thread.cwd || "(unknown)", state.privacy);
-  dom.detailId.textContent = privacyLabel(thread.id, state.privacy);
 }
 
 function digestDetailThread(item) {
@@ -1860,14 +1876,8 @@ function renderDigestDetails(parentGroup) {
   dom.detailAge.textContent = parentGroup.latestFinishedAt
     ? formatAge(Math.max(0, Math.floor((Date.now() - parentGroup.latestFinishedAt) / 1000)))
     : "(none)";
-  dom.detailTitle.textContent = `${parentGroup.finishedCount || 0} done item${
-    parentGroup.finishedCount === 1 ? "" : "s"
-  }`;
   dom.detailParent.textContent = privacyLabel(parentGroup.parentId || "(none)", state.privacy);
-  dom.detailCwd.textContent = parentGroup.latestFinishedAt
-    ? new Date(parentGroup.latestFinishedAt).toLocaleString()
-    : "(none)";
-  dom.detailId.textContent = privacyLabel(parentGroup.key, state.privacy);
+  setDetailThreadBoxesVisible(false);
   dom.detailThreadContentLabel.textContent = "Finished digest";
 
   const items = (parentGroup.digestItems || []).slice().sort((left, right) => {
@@ -1935,9 +1945,9 @@ async function loadThreadDetail(thread) {
     if (seq !== state.detailSeq || state.selectedMode !== "thread" || state.selectedId !== thread.id) {
       return;
     }
-    dom.detailThreadContent.textContent = state.privacy
-      ? "Hidden"
-      : `Unable to load thread content: ${error.message}`;
+    const errorText = `Unable to load thread content: ${error.message}`;
+    dom.detailAgentPrompt.textContent = state.privacy ? "Hidden" : errorText;
+    dom.detailLastResponse.textContent = state.privacy ? "Hidden" : errorText;
   }
 }
 

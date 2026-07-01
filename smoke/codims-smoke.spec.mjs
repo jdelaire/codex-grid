@@ -243,7 +243,13 @@ test("renders nonblank scene and action inbox", async ({ page }) => {
   await page.locator("#inboxToggle").click();
   await page.locator(".review-item-main").filter({ hasText: "Review sidebar" }).click();
   await expect(page.locator("#inspectorOverlay")).toBeVisible();
-  await expect(page.locator("#detailTitle")).toContainText("Review sidebar");
+  await expect(page.locator("#detailsContent dt").filter({ hasText: "Title / content" })).toHaveCount(0);
+  await expect(page.locator("#detailsContent dt").filter({ hasText: "CWD" })).toHaveCount(0);
+  await expect(page.locator("#detailsContent dt").filter({ hasText: "Thread id" })).toHaveCount(0);
+  await expect(page.locator("#detailAgentPrompt")).toContainText("Review sidebar behavior.");
+  await expect(page.locator("#detailLastResponse")).toContainText("Sidebar reviewed.");
+  await expect(page.locator("#detailAgentPrompt")).not.toContainText("Last response");
+  await expect(page.locator("#detailLastResponse")).not.toContainText("Agent prompt");
   await expect(page.locator("#threadMessageForm")).toHaveCount(0);
   await expect(page.locator("#threadMessageInput")).toHaveCount(0);
   await expect(page.locator("#threadMessagePreview")).toHaveCount(0);
@@ -275,12 +281,13 @@ test("keeps inspector dismissed after delayed detail load", async ({ page }) => 
   await page.locator("#inboxToggle").click();
   await page.locator(".review-item-main").filter({ hasText: "Review sidebar" }).click();
   await expect(page.locator("#inspectorOverlay")).toBeVisible();
-  await expect(page.locator("#detailThreadContent")).toContainText("Loading thread content");
+  await expect(page.locator("#detailAgentPrompt")).toContainText("Loading thread content");
   await page.locator("#inspectorClose").click();
   await expect(page.locator("#inspectorOverlay")).toBeHidden();
 
   resolveThreadDetail();
-  await expect(page.locator("#detailThreadContent")).toContainText("Sidebar reviewed");
+  await expect(page.locator("#detailAgentPrompt")).toContainText("Review sidebar behavior.");
+  await expect(page.locator("#detailLastResponse")).toContainText("Sidebar reviewed.");
   await expect(page.locator("#inspectorOverlay")).toBeHidden();
 });
 
@@ -343,7 +350,8 @@ test("mobile layout keeps scene and inspector details available", async ({ page 
   expect(drawerBox.width).toBeLessThanOrEqual(390);
   await page.locator(".review-item-main").filter({ hasText: "Review sidebar" }).click();
   await expect(page.locator("#inspectorOverlay")).toBeVisible();
-  await expect(page.locator("#detailTitle")).toContainText("Review sidebar");
+  await expect(page.locator("#detailAgentPrompt")).toBeVisible();
+  await expect(page.locator("#detailLastResponse")).toBeVisible();
   const inspectorBox = await page.locator("#inspectorOverlay").boundingBox();
   const countersBox = await page.locator(".hud-counters").boundingBox();
   expect(inspectorBox).toBeTruthy();
