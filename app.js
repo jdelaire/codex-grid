@@ -2508,7 +2508,9 @@ function animateAgents(elapsed) {
     parts.packet.scale.setScalar(0.8 + Math.sin(phase * Math.PI) * 0.9);
     parts.packetHalo.visible = true;
     parts.packetHalo.position.copy(parts.packet.position);
-    parts.packetHalo.scale.setScalar(0.75 + Math.sin(phase * Math.PI) * 0.7);
+    const haloPulse = Math.sin(phase * Math.PI);
+    parts.packetHalo.scale.setScalar(0.75 + haloPulse * 0.7);
+    parts.packetHaloMaterial.opacity = 0.18 + haloPulse * 0.1;
     parts.wideBeamMaterial.opacity = 0.1 + Math.sin(elapsed * 2.2 + phase * Math.PI) * 0.025;
   }
 
