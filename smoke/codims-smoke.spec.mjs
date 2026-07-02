@@ -282,6 +282,10 @@ test("renders nonblank scene and action inbox", async ({ page }) => {
   });
   expect(sceneDebug.programDetailParts).toBeGreaterThanOrEqual(6);
   expect(sceneDebug.glowShells).toBeGreaterThanOrEqual(3);
+  expect(sceneDebug.activeDataLanes).toBeGreaterThanOrEqual(1);
+  expect(sceneDebug.animatedDataLanes).toBeGreaterThanOrEqual(1);
+  expect(sceneDebug.programAuraRings).toBeGreaterThanOrEqual(2);
+  expect(sceneDebug.roomCircuitPulseSurfaces).toBeGreaterThanOrEqual(1);
   await expect(page.locator("#inboxBadge")).toHaveText("2");
   await expect(page.locator("#inboxToggle")).toHaveAttribute("aria-label", "2 items need review");
   await expect(page.locator("#inboxDrawer")).toBeHidden();
@@ -458,6 +462,10 @@ test("reduced motion keeps scene animation static", async ({ page }) => {
   await page.goto(`${baseUrl}/index.html`);
   await expect(page.locator("#scene canvas")).toBeVisible();
   await expect(page.locator("#activeCount")).toHaveText("1");
+  const sceneDebug = await page.evaluate(() => window.__codimsSceneDebug?.());
+  expect(sceneDebug.reducedMotionActive).toBe(true);
+  expect(sceneDebug.activeDataLanes).toBeGreaterThanOrEqual(1);
+  expect(sceneDebug.animatedDataLanes).toBe(0);
   await page.waitForTimeout(1200);
   const canvas = page.locator("#scene canvas");
   const before = await canvas.screenshot();
