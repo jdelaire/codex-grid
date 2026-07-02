@@ -1,8 +1,8 @@
-# Codims
+# Codex Grid
 
 [![CI](https://github.com/jdelaire/codims/actions/workflows/ci.yml/badge.svg)](https://github.com/jdelaire/codims/actions/workflows/ci.yml)
 
-Codims is a local 3D monitor for Codex threads and subagents. It renders projects as rooms, main threads as larger characters, and child agents as smaller workers around them.
+Codex Grid is a local 3D monitor for Codex threads and subagents. It renders projects as rooms, main threads as larger characters, and child agents as smaller workers around them.
 
 The app is intentionally small:
 
@@ -34,13 +34,13 @@ The app is intentionally small:
 python3 server.py --port 8765
 ```
 
-By default, Codims listens on `127.0.0.1` so local Codex thread data is not exposed on your LAN. Open locally:
+By default, Codex Grid listens on `127.0.0.1` so local Codex thread data is not exposed on your LAN. Open locally:
 
 ```text
 http://127.0.0.1:8765/
 ```
 
-LAN access is opt-in. Only use this on a trusted network because Codims displays local Codex thread metadata:
+LAN access is opt-in. Only use this on a trusted network because Codex Grid displays local Codex thread metadata:
 
 ```bash
 python3 server.py --host 0.0.0.0 --port 8765
@@ -92,9 +92,9 @@ Message sending is temporarily disabled server-side.
 
 ## Privacy
 
-Codims is local-first. It does not run a hosted backend and does not require API keys.
+Codex Grid is local-first. It does not run a hosted backend and does not require API keys.
 
-It reads Codex thread metadata and content from your local Codex app-server process. Three.js is vendored under `vendor/three/` so Codims can run without a build step or CDN dependency.
+It reads Codex thread metadata and content from your local Codex app-server process. Three.js is vendored under `vendor/three/` so Codex Grid can run without a build step or CDN dependency.
 
 Do not commit local Codex state databases, `.env` files, logs, keys, screenshots with private content, or exported thread dumps.
 
