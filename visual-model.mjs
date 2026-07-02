@@ -457,15 +457,21 @@ function roadId(prefix, value) {
 export function cityRoadTopology(placements) {
   const rooms = (placements || [])
     .filter((placement) => placement && Number.isFinite(Number(placement.x)) && Number.isFinite(Number(placement.z)))
-    .map((placement, index) => ({
-      index,
-      x: Number(placement.x),
-      z: Number(placement.z),
-      width: Math.max(1, Number(placement.width || 9.2)),
-      depth: Math.max(1, Number(placement.depth || 6.8)),
-      row: Number.isFinite(Number(placement.row)) ? Number(placement.row) : 0,
-      col: Number.isFinite(Number(placement.col)) ? Number(placement.col) : index,
-    }));
+    .map((placement, index) => {
+      const rawWidth = Number(placement.width || 9.2);
+      const rawDepth = Number(placement.depth || 6.8);
+      const width = Number.isFinite(rawWidth) ? Math.max(1, rawWidth) : 9.2;
+      const depth = Number.isFinite(rawDepth) ? Math.max(1, rawDepth) : 6.8;
+      return {
+        index,
+        x: Number(placement.x),
+        z: Number(placement.z),
+        width,
+        depth,
+        row: Number.isFinite(Number(placement.row)) ? Number(placement.row) : 0,
+        col: Number.isFinite(Number(placement.col)) ? Number(placement.col) : index,
+      };
+    });
 
   if (!rooms.length) {
     return {
@@ -578,10 +584,13 @@ export function cityBikeRoutes(topology, roomStates = [], options = {}) {
   }
   const activeProjectCount = roomStates.filter((room) => room.hasActiveThreads).length;
   const budget = cityTrafficBudget({
-    projectCount: roomStates.length || 1,
+    projectCount: roomStates.length,
     activeProjectCount,
     viewportWidth: options.viewportWidth,
   });
+  if (!budget) {
+    return [];
+  }
   const fullRouteCount = Math.min(budget, Math.max(2, roads.length * 2));
   const routeCount = options.reducedMotion ? Math.min(2, fullRouteCount) : fullRouteCount;
   const routes = [];

@@ -930,6 +930,12 @@ assert.equal(oneRoomTopology.horizontalRoads.length, 2);
 assert.equal(oneRoomTopology.verticalRoads.length, 2);
 assert.equal(oneRoomTopology.intersections.length, 4);
 
+const malformedTopology = cityRoadTopology([{ x: 0, z: 0, width: Infinity, depth: NaN, row: 0, col: 0 }]);
+assert.equal(Number.isFinite(malformedTopology.bounds.width), true);
+assert.equal(Number.isFinite(malformedTopology.bounds.depth), true);
+assert.equal(malformedTopology.verticalRoads.every((road) => Number.isFinite(road.x)), true);
+assert.equal(malformedTopology.horizontalRoads.every((road) => Number.isFinite(road.z)), true);
+
 assert.equal(cityTrafficBudget({ projectCount: 0, activeProjectCount: 0, viewportWidth: 1200 }), 0);
 assert.equal(cityTrafficBudget({ projectCount: 1, activeProjectCount: 0, viewportWidth: 1200 }), 3);
 assert.equal(cityTrafficBudget({ projectCount: 8, activeProjectCount: 4, viewportWidth: 1600 }), 16);
@@ -945,6 +951,7 @@ assert.equal(routes.some((route) => route.kind === "active"), true);
 assert.equal(routes.some((route) => route.kind === "done"), true);
 assert.equal(routes.every((route) => route.id && route.segmentId), true);
 assert.equal(routes.every((route) => route.trailLength >= 0.7 && route.trailLength <= 1.8), true);
+assert.deepEqual(cityBikeRoutes(topology, [], { viewportWidth: 1200 }), []);
 
 const reducedRoutes = cityBikeRoutes(topology, [
   { project: "codims", x: 0, z: 0, hasActiveThreads: true, doneCount: 0 },
