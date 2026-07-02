@@ -81,15 +81,12 @@ const dom = {
 
 const parentPalette = [
   0x00e5ff,
-  0x2fffd0,
-  0xff8a00,
-  0xff3df2,
-  0x8b5cf6,
-  0x7df9ff,
-  0xffc857,
-  0x39ff88,
   0x5cc8ff,
-  0xff5a3d,
+  0xff8a00,
+  0x7df9ff,
+  0x1ea7c6,
+  0xffb25c,
+  0x9ff7ff,
 ];
 
 const gridStudio = {
@@ -98,10 +95,10 @@ const gridStudio = {
   ambientGround: 0x02040a,
   gridCenter: 0x00364a,
   gridLine: 0x00151f,
-  active: 0x2fffd0,
+  active: 0x00e5ff,
   done: 0xff8a00,
   digest: 0xff8a00,
-  reviewed: 0x4b6470,
+  reviewed: 0x8fb7c2,
   cyan: 0x00e5ff,
   cyanSoft: 0x1ea7c6,
   panelBlack: 0x020813,
@@ -712,11 +709,11 @@ function agentGlowForState(thread) {
   if (thread.state === "DONE") {
     return { color: gridStudio.done, opacity: 0.28 };
   }
-  return { color: 0x35525e, opacity: 0.12 };
+  return { color: 0x1e6b80, opacity: 0.12 };
 }
 
 function agentBodyColor(thread, parentColorHex) {
-  return thread.state === "DONE" ? 0x3b2108 : parentColorHex;
+  return thread.state === "DONE" ? 0x07111b : parentColorHex;
 }
 
 function agentLabelBorderColor(thread, parentCssColor) {
@@ -878,10 +875,10 @@ function createDigestObject(parentGroup) {
   group.userData.digestKey = parentGroup.key;
 
   const baseMaterial = new THREE.MeshStandardMaterial({
-    color: 0x2c1602,
+    color: 0x07111b,
     roughness: 0.5,
     metalness: 0.22,
-    emissive: 0x4a2100,
+    emissive: gridStudio.digest,
     emissiveIntensity: 0.16,
   });
   const tokenMaterial = new THREE.MeshStandardMaterial({
@@ -892,7 +889,7 @@ function createDigestObject(parentGroup) {
     emissiveIntensity: 0.2,
   });
   const ringMaterial = new THREE.MeshBasicMaterial({
-    color: 0xffb000,
+    color: gridStudio.digest,
     transparent: true,
     opacity: 0.46,
     blending: THREE.AdditiveBlending,
@@ -925,13 +922,13 @@ function updateDigestObjectReviewState(digestObject, reviewState) {
   digestObject.userData.doneObjectInactive = inactive;
   digestObject.userData.remainingReviewCount = reviewState.unreviewed;
 
-  parts.baseMaterial.color.setHex(inactive ? 0x101820 : 0x2c1602);
-  parts.baseMaterial.emissive.setHex(inactive ? 0x000000 : 0x4a2100);
+  parts.baseMaterial.color.setHex(inactive ? 0x101820 : 0x07111b);
+  parts.baseMaterial.emissive.setHex(inactive ? 0x000000 : gridStudio.digest);
   parts.baseMaterial.emissiveIntensity = inactive ? 0 : 0.16;
   parts.tokenMaterial.color.setHex(inactive ? gridStudio.reviewed : gridStudio.digest);
   parts.tokenMaterial.emissive.setHex(inactive ? 0x000000 : gridStudio.digest);
   parts.tokenMaterial.emissiveIntensity = inactive ? 0 : 0.2;
-  parts.ringMaterial.color.setHex(inactive ? 0x4b6470 : 0xffb000);
+  parts.ringMaterial.color.setHex(inactive ? gridStudio.reviewed : gridStudio.digest);
   parts.ringMaterial.opacity = inactive ? 0.12 : 0.46;
 }
 

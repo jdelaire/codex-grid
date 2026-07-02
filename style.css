@@ -11,24 +11,22 @@
   --text: #eefcff;
   --muted: #8fb7c2;
   --accent: #00e5ff;
-  --active: #2fffd0;
+  --active: #00e5ff;
   --warn: #ff8a00;
-  --magenta: #ff3df2;
-  --violet: #8b5cf6;
 }
 
 @keyframes running-pulse {
   0%,
   100% {
     box-shadow:
-      0 0 0 rgba(47, 255, 208, 0),
+      0 0 0 rgba(0, 229, 255, 0),
       0 0 18px rgba(0, 229, 255, 0.12),
       0 12px 32px rgba(0, 0, 0, 0.34);
   }
 
   50% {
     box-shadow:
-      0 0 26px rgba(47, 255, 208, 0.42),
+      0 0 26px rgba(0, 229, 255, 0.42),
       0 0 34px rgba(0, 229, 255, 0.2),
       0 12px 32px rgba(0, 0, 0, 0.34);
   }
@@ -221,7 +219,7 @@ p {
 }
 
 .counter + .counter {
-  border-left: 1px solid rgba(172, 188, 209, 0.14);
+  border-left: 1px solid rgba(143, 183, 194, 0.14);
 }
 
 .counter > span:not(.counter-label) {
@@ -244,7 +242,7 @@ p {
 }
 
 .counter.is-running {
-  background: linear-gradient(180deg, rgba(23, 90, 68, 0.62), rgba(5, 30, 25, 0.54));
+  background: linear-gradient(180deg, rgba(0, 65, 82, 0.62), rgba(0, 22, 32, 0.54));
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--active) 42%, transparent) inset;
   animation: running-pulse 1.35s ease-in-out infinite;
 }
@@ -319,9 +317,9 @@ p {
 
 .agent-label.is-active,
 .parent-label.is-active {
-  color: #d7fff7;
-  border-color: rgba(47, 255, 208, 0.78);
-  background: rgba(3, 24, 22, 0.9);
+  color: #eaffff;
+  border-color: rgba(0, 229, 255, 0.78);
+  background: rgba(2, 18, 28, 0.9);
   animation: running-pulse 1.25s ease-in-out infinite;
 }
 
@@ -348,7 +346,7 @@ p {
 
 .agent-label.is-done,
 .digest-label {
-  color: #fff2d6;
+  color: #eaffff;
   border-color: rgba(255, 138, 0, 0.72);
   box-shadow:
     0 0 20px rgba(255, 138, 0, 0.24),
@@ -356,14 +354,14 @@ p {
 }
 
 .digest-label.is-empty {
-  color: #d6c5a2;
-  border-color: rgba(245, 158, 11, 0.34);
+  color: #8fb7c2;
+  border-color: rgba(255, 138, 0, 0.34);
   opacity: 0.82;
 }
 
 .digest-label.is-reviewed {
   color: #cbd5e1;
-  border-color: rgba(148, 163, 184, 0.36);
+  border-color: rgba(143, 183, 194, 0.36);
   background: rgba(15, 23, 42, 0.72);
   box-shadow: 0 10px 26px rgba(0, 0, 0, 0.26);
   opacity: 0.72;
@@ -508,7 +506,7 @@ p {
 .settings-form input {
   width: 82px;
   min-height: 34px;
-  border: 1px solid rgba(172, 188, 209, 0.18);
+  border: 1px solid rgba(143, 183, 194, 0.18);
   border-radius: 6px;
   background: rgba(4, 7, 14, 0.74);
   color: var(--text);
@@ -538,7 +536,7 @@ p {
   gap: 10px;
   margin-bottom: 16px;
   padding-bottom: 16px;
-  border-bottom: 1px solid rgba(172, 188, 209, 0.16);
+  border-bottom: 1px solid rgba(143, 183, 194, 0.16);
 }
 
 .review-lane-header {
@@ -700,9 +698,9 @@ p {
   display: grid;
   place-items: center;
   width: 76px;
-  border: 1px solid rgba(172, 188, 209, 0.18);
+  border: 1px solid rgba(143, 183, 194, 0.18);
   border-radius: 6px;
-  background: rgba(148, 163, 184, 0.08);
+  background: rgba(143, 183, 194, 0.08);
   color: var(--muted);
   font-size: 11px;
   line-height: 1.15;
@@ -716,9 +714,9 @@ p {
 }
 
 .review-item.is-stale .review-status-pill {
-  color: #fef3c7;
-  border-color: rgba(245, 158, 11, 0.46);
-  background: rgba(245, 158, 11, 0.1);
+  color: #ffb25c;
+  border-color: rgba(255, 138, 0, 0.46);
+  background: rgba(255, 138, 0, 0.1);
 }
 
 .details-heading {
@@ -743,7 +741,7 @@ p {
   padding: 5px 8px;
   color: var(--muted);
   font-size: 12px;
-  background: rgba(148, 163, 184, 0.08);
+  background: rgba(143, 183, 194, 0.08);
 }
 
 #detailState.is-running {
@@ -755,10 +753,10 @@ p {
 
 #detailState.is-done,
 #detailState.is-digest {
-  color: #fef3c7;
-  border-color: rgba(245, 158, 11, 0.5);
-  background: rgba(245, 158, 11, 0.1);
-  box-shadow: 0 0 18px rgba(245, 158, 11, 0.13);
+  color: #ffb25c;
+  border-color: rgba(255, 138, 0, 0.5);
+  background: rgba(255, 138, 0, 0.1);
+  box-shadow: 0 0 18px rgba(255, 138, 0, 0.13);
 }
 
 dl {
@@ -789,7 +787,7 @@ dd {
 .thread-content {
   max-height: 360px;
   overflow: auto;
-  border: 1px solid rgba(172, 188, 209, 0.18);
+  border: 1px solid rgba(143, 183, 194, 0.18);
   border-radius: 6px;
   background: rgba(4, 7, 13, 0.58);
   padding: 12px;
@@ -918,9 +916,9 @@ dd {
   display: grid;
   place-items: center;
   width: 92px;
-  border: 1px solid rgba(172, 188, 209, 0.18);
+  border: 1px solid rgba(143, 183, 194, 0.18);
   border-radius: 6px;
-  background: rgba(148, 163, 184, 0.08);
+  background: rgba(143, 183, 194, 0.08);
   color: var(--muted);
   font-size: 11px;
   line-height: 1.15;
@@ -929,9 +927,9 @@ dd {
 
 .timeline-item.is-active .timeline-status,
 .timeline-item.is-finished .timeline-status {
-  color: #fef3c7;
-  border-color: rgba(245, 158, 11, 0.46);
-  background: rgba(245, 158, 11, 0.1);
+  color: #ffb25c;
+  border-color: rgba(255, 138, 0, 0.46);
+  background: rgba(255, 138, 0, 0.1);
 }
 
 .timeline-item.is-active .timeline-status {
