@@ -9,6 +9,7 @@ import {
   buildActionInbox,
   buildParentTimeline,
   buildProjectParentGroups,
+  childVisualLayoutEntries,
   childVisualLayout,
   cityBikeRoutes,
   cityRoadTopology,
@@ -20,7 +21,7 @@ import {
   handoffShouldAnimate,
   matchesThreadSearch,
   normalizePreferences,
-  parentGroupOffset,
+  parentVisualLayoutEntries,
   parseReviewedThreadIds,
   privacyLabel,
   projectDisplayText,
@@ -297,6 +298,11 @@ const PROJECT_SIGN_STRUT_BASE_Y = 0.18;
 const PROJECT_SIGN_STRUT_TOP_Y = PROJECT_SIGN_Y - 0.18;
 const PROJECT_SIGN_STRUT_HEIGHT = PROJECT_SIGN_STRUT_TOP_Y - PROJECT_SIGN_STRUT_BASE_Y;
 const PROJECT_SIGN_STRUT_Y = PROJECT_SIGN_STRUT_BASE_Y + PROJECT_SIGN_STRUT_HEIGHT / 2;
+const REVIEW_BEAM_HEIGHT = 16;
+const REVIEW_BEAM_BASE_Y = 0.48;
+const REVIEW_BEAM_PARTICLE_COUNT = 128;
+const REVIEW_BEAM_SPARK_COUNT = 48;
+let reviewBeamParticleTexture = null;
 
 function drawRoundedRect(ctx, x, y, width, height, radius) {
   const right = x + width;
@@ -1185,17 +1191,195 @@ function createDigestObject(parentGroup) {
   ring.position.y = 0.22;
   group.add(ring);
 
-  group.userData.parts = { pedestal, token, ring, baseMaterial, tokenMaterial, ringMaterial };
+  const reviewBeam = createReviewBeam();
+  group.add(reviewBeam);
+
+  group.userData.parts = {
+    pedestal,
+    token,
+    ring,
+    reviewBeam,
+    baseMaterial,
+    tokenMaterial,
+    ringMaterial,
+    ...reviewBeam.userData.parts,
+  };
   group.userData.pickables = [pedestal, token, ring];
   scene.add(group);
   return group;
 }
 
+function createReviewBeam() {
+  const group = new THREE.Group();
+  group.visible = false;
+  group.userData.reviewBeamRoot = true;
+
+  const shaftMaterial = new THREE.MeshBasicMaterial({
+    color: gridStudio.cyan,
+    transparent: true,
+    opacity: 0.36,
+    depthTest: false,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+  });
+  const coreMaterial = new THREE.MeshBasicMaterial({
+    color: 0x7df9ff,
+    transparent: true,
+    opacity: 0.42,
+    depthTest: false,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+  });
+  const haloMaterial = new THREE.MeshBasicMaterial({
+    color: gridStudio.cyan,
+    transparent: true,
+    opacity: 0.32,
+    depthTest: false,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+  });
+  const targetMaterial = new THREE.MeshBasicMaterial({
+    color: 0x7df9ff,
+    transparent: true,
+    opacity: 0.88,
+    depthTest: false,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+
+  const shaft = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.42, 0.72, REVIEW_BEAM_HEIGHT, 48, 1, true),
+    shaftMaterial,
+  );
+  shaft.position.y = REVIEW_BEAM_BASE_Y + REVIEW_BEAM_HEIGHT / 2;
+  shaft.renderOrder = 40;
+  shaft.userData.reviewBeamPart = true;
+  group.add(shaft);
+
+  const core = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.13, 0.24, REVIEW_BEAM_HEIGHT, 32, 1, true),
+    coreMaterial,
+  );
+  core.position.y = shaft.position.y;
+  core.renderOrder = 41;
+  core.userData.reviewBeamPart = true;
+  group.add(core);
+
+  const skyHalo = new THREE.Mesh(new THREE.CircleGeometry(1.05, 64), haloMaterial);
+  skyHalo.rotation.x = -Math.PI / 2;
+  skyHalo.position.y = REVIEW_BEAM_BASE_Y + REVIEW_BEAM_HEIGHT;
+  skyHalo.renderOrder = 42;
+  skyHalo.userData.reviewBeamPart = true;
+  group.add(skyHalo);
+
+  const targetRing = new THREE.Mesh(new THREE.TorusGeometry(0.74, 0.028, 8, 72), targetMaterial);
+  targetRing.rotation.x = Math.PI / 2;
+  targetRing.position.y = REVIEW_BEAM_BASE_Y;
+  targetRing.renderOrder = 42;
+  targetRing.userData.reviewBeamPart = true;
+  group.add(targetRing);
+
+  const particles = createReviewBeamParticleField(
+    REVIEW_BEAM_PARTICLE_COUNT,
+    0.76,
+    2.6,
+    0.5,
+    gridStudio.cyan,
+  );
+  particles.renderOrder = 43;
+  group.add(particles);
+
+  const sparks = createReviewBeamParticleField(
+    REVIEW_BEAM_SPARK_COUNT,
+    1,
+    3.8,
+    0.7,
+    0x7df9ff,
+  );
+  sparks.renderOrder = 44;
+  group.add(sparks);
+
+  group.userData.parts = {
+    reviewBeamShaft: shaft,
+    reviewBeamCore: core,
+    reviewBeamSkyHalo: skyHalo,
+    reviewBeamTargetRing: targetRing,
+    reviewBeamParticles: particles,
+    reviewBeamSparks: sparks,
+    reviewBeamShaftMaterial: shaftMaterial,
+    reviewBeamCoreMaterial: coreMaterial,
+    reviewBeamHaloMaterial: haloMaterial,
+    reviewBeamTargetMaterial: targetMaterial,
+    reviewBeamParticleMaterial: particles.material,
+    reviewBeamSparkMaterial: sparks.material,
+  };
+  return group;
+}
+
+function createReviewBeamParticleField(count, radius, size, opacity, color) {
+  const positions = new Float32Array(count * 3);
+  const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+  for (let index = 0; index < count; index += 1) {
+    const t = count <= 1 ? 0 : index / (count - 1);
+    const angle = index * goldenAngle;
+    const radialJitter = 0.62 + ((index * 37) % 29) / 80;
+    const yJitter = (((index * 17) % 23) - 11) * 0.012;
+    const offset = index * 3;
+    positions[offset] = Math.cos(angle) * radius * radialJitter;
+    positions[offset + 1] = REVIEW_BEAM_BASE_Y + t * REVIEW_BEAM_HEIGHT + yJitter;
+    positions[offset + 2] = Math.sin(angle) * radius * radialJitter;
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  const material = new THREE.PointsMaterial({
+    color,
+    map: getReviewBeamParticleTexture(),
+    size,
+    transparent: true,
+    opacity,
+    alphaTest: 0.03,
+    depthTest: false,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    sizeAttenuation: false,
+  });
+  const particles = new THREE.Points(geometry, material);
+  particles.userData.reviewBeamParticles = true;
+  return particles;
+}
+
+function getReviewBeamParticleTexture() {
+  if (reviewBeamParticleTexture) {
+    return reviewBeamParticleTexture;
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 32;
+  canvas.height = 32;
+  const ctx = canvas.getContext("2d");
+  ctx.translate(16, 16);
+  ctx.rotate(Math.PI / 4);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.28)";
+  ctx.fillRect(-9, -9, 18, 18);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+  ctx.fillRect(-4, -4, 8, 8);
+  reviewBeamParticleTexture = new THREE.CanvasTexture(canvas);
+  reviewBeamParticleTexture.colorSpace = THREE.SRGBColorSpace;
+  return reviewBeamParticleTexture;
+}
+
 function updateDigestObjectReviewState(digestObject, reviewState) {
   const inactive = Boolean(reviewState.doneObjectInactive);
+  const needsReview = Boolean(reviewState.needsReview);
   const parts = digestObject.userData.parts;
   digestObject.userData.doneObjectInactive = inactive;
+  digestObject.userData.needsReview = needsReview;
   digestObject.userData.remainingReviewCount = reviewState.unreviewed;
+  parts.reviewBeam.visible = needsReview;
 
   parts.baseMaterial.color.setHex(inactive ? 0x101820 : 0x07111b);
   parts.baseMaterial.emissive.setHex(inactive ? 0x000000 : gridStudio.digest);
@@ -1338,10 +1522,10 @@ function updateHandoffGeometry(handoff, start, end, color, active) {
 function assignParentGroupCenters(parentGroups, layout) {
   const positions = new Map();
 
-  parentGroups.forEach((parentGroup, index) => {
-    const { x, z } = parentGroupOffset(index, parentGroups.length, layout);
+  for (const { parentGroup, offset } of parentVisualLayoutEntries(parentGroups, layout)) {
+    const { x, z } = offset;
     positions.set(parentGroup.key, new THREE.Vector3(x, 0, z));
-  });
+  }
 
   return positions;
 }
@@ -1451,7 +1635,11 @@ function updateAgentVisualState(agent, threadId) {
   const label = state.agentLabels.get(threadId);
   if (label) {
     label.classList.toggle("is-selected", selected);
-    label.style.borderColor = selected ? SELECTED_LABEL_BORDER : label.dataset.borderColor || "";
+    label.style.borderColor = selected
+      ? SELECTED_LABEL_BORDER
+      : label.classList.contains("is-inactive")
+        ? ""
+        : label.dataset.borderColor || "";
   }
 }
 
@@ -1499,6 +1687,9 @@ function sceneDebugSnapshot() {
     lightCycleBikes: 0,
     lightCycleTrails: 0,
     animatedLightCycles: 0,
+    reviewBeams: 0,
+    visibleReviewBeams: 0,
+    reviewBeamParticleFields: 0,
   };
   scene.traverse((object) => {
     if (object.isPointLight) {
@@ -1530,6 +1721,15 @@ function sceneDebugSnapshot() {
     }
     if (object.userData.animatedLightCycle) {
       snapshot.animatedLightCycles += 1;
+    }
+    if (object.userData.reviewBeamRoot) {
+      snapshot.reviewBeams += 1;
+      if (object.visible !== false) {
+        snapshot.visibleReviewBeams += 1;
+      }
+    }
+    if (object.userData.reviewBeamParticles && object.visible !== false) {
+      snapshot.reviewBeamParticleFields += 1;
     }
     if (object.userData.dataLanePart && materialDisablesDepthTest(object.material)) {
       snapshot.depthTestDisabledDataLanes += 1;
@@ -1937,8 +2137,8 @@ function reconcileAgents(projectGroups) {
       digestLabel.classList.toggle("is-empty", !parentGroup.finishedCount);
       digestLabel.classList.toggle("is-reviewed", digestReviewState.doneObjectInactive);
 
-      for (const [index, thread] of parentGroup.children.entries()) {
-        const child = childPosition(parentPositions.get(parentGroup.key), index, parentGroup.children.length);
+      for (const { thread, layoutIndex } of childVisualLayoutEntries(parentGroup.children)) {
+        const child = childPosition(parentPositions.get(parentGroup.key), layoutIndex, parentGroup.children.length);
         const localPosition = child.position;
         const worldPosition = room.position.clone().add(localPosition);
         let agent = state.agents.get(thread.id);
@@ -1981,14 +2181,15 @@ function reconcileAgents(projectGroups) {
           thread.state === "ACTIVE",
         );
         label.classList.toggle("is-active", thread.state === "ACTIVE");
+        label.classList.toggle("is-inactive", thread.state !== "ACTIVE");
         label.classList.toggle("is-done", thread.state === "DONE");
         label.dataset.threadId = thread.id;
         label.dataset.parentId = thread.parent_id || thread.id;
-        label.dataset.roomIndex = String(index);
+        label.dataset.roomIndex = String(layoutIndex);
         label.dataset.layoutRing = String(child.layout.ring);
         const agentBorderColor = agentLabelBorderColor(thread, parentCssColor);
         label.dataset.borderColor = agentBorderColor;
-        label.style.borderColor = agentBorderColor;
+        label.style.borderColor = thread.state === "ACTIVE" ? agentBorderColor : "";
         label.style.boxShadow = "";
 
         const handoffKey = `${parentGroup.key}:${thread.id}`;
@@ -2993,6 +3194,12 @@ function animateAgents(elapsed) {
       parts.token.rotation.y = 0;
       parts.ring.scale.setScalar(selected ? 1.12 : 1);
       parts.ringMaterial.opacity = digestObject.userData.doneObjectInactive ? inactiveOpacity : 0.46;
+      if (digestObject.userData.needsReview) {
+        parts.reviewBeam.scale.setScalar(selected ? 1.08 : 1);
+        parts.reviewBeamTargetRing.scale.setScalar(selected ? 1.08 : 1);
+        parts.reviewBeamParticles.rotation.y = 0;
+        parts.reviewBeamSparks.rotation.y = 0.34;
+      }
       continue;
     }
     if (digestObject.userData.doneObjectInactive) {
@@ -3005,6 +3212,22 @@ function animateAgents(elapsed) {
     parts.token.rotation.y = elapsed * 0.28;
     parts.ring.scale.setScalar(selected ? Math.max(1.12, pulse) : pulse);
     parts.ringMaterial.opacity = 0.46;
+    if (digestObject.userData.needsReview) {
+      const beamPulse = 0.5 + Math.sin(elapsed * 1.35 + hashString(digestObject.userData.digestKey || "")) * 0.5;
+      parts.reviewBeam.scale.setScalar(selected ? 1.08 : 1);
+      parts.reviewBeamCoreMaterial.opacity = 0.34 + beamPulse * 0.16;
+      parts.reviewBeamShaftMaterial.opacity = 0.28 + beamPulse * 0.12;
+      parts.reviewBeamHaloMaterial.opacity = 0.24 + beamPulse * 0.14;
+      parts.reviewBeamTargetMaterial.opacity = 0.72 + beamPulse * 0.2;
+      parts.reviewBeamTargetRing.scale.setScalar(1 + beamPulse * 0.12);
+      parts.reviewBeamSkyHalo.rotation.z = elapsed * 0.18;
+      parts.reviewBeamParticles.rotation.y = elapsed * 0.18;
+      parts.reviewBeamSparks.rotation.y = -elapsed * 0.34;
+      parts.reviewBeamParticles.position.y = Math.sin(elapsed * 0.9) * 0.12;
+      parts.reviewBeamSparks.position.y = Math.sin(elapsed * 1.4 + 1.2) * 0.18;
+      parts.reviewBeamParticleMaterial.opacity = 0.36 + beamPulse * 0.16;
+      parts.reviewBeamSparkMaterial.opacity = 0.52 + beamPulse * 0.18;
+    }
   }
 
   for (const room of state.rooms.values()) {

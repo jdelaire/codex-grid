@@ -353,6 +353,20 @@ p {
     0 10px 26px rgba(0, 0, 0, 0.32);
 }
 
+.agent-label.is-inactive:not(.is-selected) {
+  border-color: rgba(255, 138, 0, 0.34);
+  background: rgba(2, 8, 14, 0.76);
+  color: #8fb7c2;
+  font-size: 11px;
+  font-weight: 760;
+  text-transform: uppercase;
+  letter-spacing: 0;
+  opacity: 0.82;
+  box-shadow:
+    0 0 20px rgba(255, 138, 0, 0.24),
+    0 10px 26px rgba(0, 0, 0, 0.32);
+}
+
 .digest-label.is-empty {
   color: #8fb7c2;
   border-color: rgba(255, 138, 0, 0.34);

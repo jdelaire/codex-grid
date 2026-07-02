@@ -20,6 +20,7 @@ import {
   matchesThreadSearch,
   normalizePreferences,
   parentGroupOffset,
+  parentVisualLayoutEntries,
   parseReviewedThreadIds,
   privacyLabel,
   privacyPath,
@@ -41,6 +42,7 @@ import {
   staleInboxCutoffMs,
   threadActivityLabel,
   sceneObjectIsSelected,
+  childVisualLayoutEntries,
 } from "./visual-model.mjs";
 
 const threads = [
@@ -816,6 +818,35 @@ assert.ok(Math.hypot(twoChildOffset.x, twoChildOffset.z) >= 1.75);
 
 const oneChildOffset = childHandoffOffset(0, 1);
 assert.ok(oneChildOffset.z >= 1.9);
+
+const visualChildEntries = childVisualLayoutEntries(parentGroup.children);
+const activeChildEntry = visualChildEntries.find((entry) => entry.thread.id === "child-a");
+assert.deepEqual(
+  visualChildEntries.map((entry) => entry.thread.id),
+  ["child-a", "child-c", "child-d", "child-b"],
+);
+assert.equal(activeChildEntry.layoutIndex, 0);
+assert.equal(
+  activeChildEntry.layout.z,
+  Math.max(...visualChildEntries.map((entry) => entry.layout.z)),
+);
+
+const parentLayoutEntries = parentVisualLayoutEntries(
+  [
+    { key: "active-parent", isActive: true, children: [{}] },
+    { key: "idle-a", isActive: false, children: [{}] },
+    { key: "idle-b", isActive: false, children: [{}] },
+    { key: "idle-c", isActive: false, children: [{}] },
+  ],
+);
+const activeParentEntry = parentLayoutEntries.find(
+  (entry) => entry.parentGroup.key === "active-parent",
+);
+assert.equal(activeParentEntry.layoutIndex, 3);
+assert.equal(
+  activeParentEntry.offset.z,
+  Math.max(...parentLayoutEntries.map((entry) => entry.offset.z)),
+);
 
 const innerRingFront = childHandoffOffset(0, 24);
 const innerRingBack = childHandoffOffset(4, 24);

@@ -300,6 +300,54 @@ test("renders nonblank scene and action inbox", async ({ page }) => {
   expect(sceneDebug.lightCycleBikes).toBeLessThanOrEqual(36);
   expect(sceneDebug.lightCycleTrails).toBeGreaterThanOrEqual(2);
   expect(sceneDebug.animatedLightCycles).toBeGreaterThanOrEqual(1);
+  expect(sceneDebug.reviewBeams).toBeGreaterThanOrEqual(1);
+  expect(sceneDebug.visibleReviewBeams).toBe(1);
+  expect(sceneDebug.reviewBeamParticleFields).toBeGreaterThanOrEqual(2);
+  await page.locator("#settingsToggle").click();
+  await page.locator("#inactiveToggle").click();
+  await expect(page.locator('.agent-label[data-thread-id="child-done"]')).toHaveCount(1);
+  await page.locator("#settingsClose").click();
+  const labelStyles = await page.evaluate(() => {
+    const active = document.querySelector('.agent-label[data-thread-id="child-active"]');
+    const inactive = document.querySelector('.agent-label[data-thread-id="child-done"]');
+    const emptyDigest = document.createElement("div");
+    emptyDigest.className = "digest-label is-empty";
+    emptyDigest.textContent = "0 done";
+    document.querySelector("#labels")?.appendChild(emptyDigest);
+    const activeStyles = active ? getComputedStyle(active) : null;
+    const inactiveStyles = inactive ? getComputedStyle(inactive) : null;
+    const emptyDigestStyles = getComputedStyle(emptyDigest);
+    return {
+      activeOpacity: activeStyles?.opacity || null,
+      inactiveClass: inactive?.className || null,
+      inactiveBackground: inactiveStyles?.backgroundColor || null,
+      inactiveBorderColor: inactiveStyles?.borderTopColor || null,
+      inactiveBoxShadow: inactiveStyles?.boxShadow || null,
+      inactiveColor: inactiveStyles?.color || null,
+      inactiveFontSize: inactiveStyles?.fontSize || null,
+      inactiveFontWeight: inactiveStyles?.fontWeight || null,
+      inactiveOpacity: inactiveStyles?.opacity || null,
+      inactiveTextTransform: inactiveStyles?.textTransform || null,
+      emptyDigestBackground: emptyDigestStyles.backgroundColor,
+      emptyDigestBorderColor: emptyDigestStyles.borderTopColor,
+      emptyDigestBoxShadow: emptyDigestStyles.boxShadow,
+      emptyDigestColor: emptyDigestStyles.color,
+      emptyDigestFontSize: emptyDigestStyles.fontSize,
+      emptyDigestFontWeight: emptyDigestStyles.fontWeight,
+      emptyDigestOpacity: emptyDigestStyles.opacity,
+      emptyDigestTextTransform: emptyDigestStyles.textTransform,
+    };
+  });
+  expect(labelStyles.inactiveClass).toContain("is-inactive");
+  expect(labelStyles.inactiveBackground).toBe(labelStyles.emptyDigestBackground);
+  expect(labelStyles.inactiveBorderColor).toBe(labelStyles.emptyDigestBorderColor);
+  expect(labelStyles.inactiveBoxShadow).toBe(labelStyles.emptyDigestBoxShadow);
+  expect(labelStyles.inactiveColor).toBe(labelStyles.emptyDigestColor);
+  expect(labelStyles.inactiveFontSize).toBe(labelStyles.emptyDigestFontSize);
+  expect(labelStyles.inactiveFontWeight).toBe(labelStyles.emptyDigestFontWeight);
+  expect(labelStyles.inactiveOpacity).toBe(labelStyles.emptyDigestOpacity);
+  expect(labelStyles.inactiveTextTransform).toBe(labelStyles.emptyDigestTextTransform);
+  expect(Number(labelStyles.inactiveOpacity)).toBeLessThan(Number(labelStyles.activeOpacity));
   await expect(page.locator("#inboxBadge")).toHaveText("2");
   await expect(page.locator("#inboxToggle")).toHaveAttribute("aria-label", "2 items need review");
   await expect(page.locator("#inboxDrawer")).toBeHidden();
@@ -358,6 +406,19 @@ test("renders nonblank scene and action inbox", async ({ page }) => {
 
   const nonBlank = await hasNonBlankScreenshot(page, page.locator("#scene canvas"));
   expect(nonBlank).toBe(true);
+});
+
+test("hides review beam when digest items are reviewed", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("codims.reviewedThreads.v1", JSON.stringify(["child-done", "parent"]));
+  });
+  await page.goto(`${baseUrl}/index.html`);
+  await expect(page.locator("#activeCount")).toHaveText("1");
+
+  const sceneDebug = await page.evaluate(() => window.__codimsSceneDebug?.());
+  expect(sceneDebug.reviewBeams).toBeGreaterThanOrEqual(1);
+  expect(sceneDebug.visibleReviewBeams).toBe(0);
+  await expect(page.locator("#inboxBadge")).toHaveText("0");
 });
 
 test("keeps inspector dismissed after delayed detail load", async ({ page }) => {

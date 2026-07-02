@@ -340,6 +340,24 @@ export function childVisualLayout(index, total) {
   };
 }
 
+export function childVisualLayoutEntries(children = []) {
+  const entries = (Array.isArray(children) ? children : []).map((thread, index) => ({
+    thread,
+    index,
+  }));
+  return entries
+    .slice()
+    .sort((left, right) => {
+      const activeDelta = Number(right.thread?.state === "ACTIVE") - Number(left.thread?.state === "ACTIVE");
+      return activeDelta || left.index - right.index;
+    })
+    .map((entry, layoutIndex) => ({
+      ...entry,
+      layoutIndex,
+      layout: childVisualLayout(layoutIndex, entries.length),
+    }));
+}
+
 export function projectRoomLayout(parentGroups) {
   const count = Math.max(parentGroups.length, 1);
   const cols = Math.min(3, Math.ceil(Math.sqrt(count)));
@@ -662,6 +680,25 @@ export function parentGroupOffset(index, total, layout = projectRoomLayout(Array
     x: (col - (cols - 1) / 2) * layout.cellWidth,
     z: (row - (rows - 1) / 2) * layout.cellDepth - 0.25,
   };
+}
+
+export function parentVisualLayoutEntries(parentGroups = [], layout = projectRoomLayout(parentGroups)) {
+  const entries = (Array.isArray(parentGroups) ? parentGroups : []).map((parentGroup, index) => ({
+    parentGroup,
+    index,
+  }));
+  return entries
+    .slice()
+    .sort((left, right) => {
+      const activeDelta =
+        Number(left.parentGroup?.isActive === true) - Number(right.parentGroup?.isActive === true);
+      return activeDelta || left.index - right.index;
+    })
+    .map((entry, layoutIndex) => ({
+      ...entry,
+      layoutIndex,
+      offset: parentGroupOffset(layoutIndex, entries.length, layout),
+    }));
 }
 
 export function projectDisplayText(project, count) {
