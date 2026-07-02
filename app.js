@@ -10,6 +10,7 @@ import {
   buildParentTimeline,
   buildProjectParentGroups,
   childVisualLayout,
+  cityBikeRoutes,
   cityRoadTopology,
   densityScale,
   filterActionInboxItems,
@@ -190,6 +191,8 @@ const state = {
   cityRoadTopologyKey: null,
   cityRoadSegments: new Map(),
   cityIntersections: new Map(),
+  lightCycles: new Map(),
+  lightCycleRoutes: [],
   detailCache: new Map(),
   detailSeq: 0,
   refreshing: false,
@@ -818,6 +821,16 @@ function markCityRoadSegment(object) {
 
 function markCityIntersection(object) {
   object.userData.cityIntersection = true;
+  return object;
+}
+
+function markLightCycleBike(object) {
+  object.userData.lightCycleBike = true;
+  return object;
+}
+
+function markLightCycleTrail(object) {
+  object.userData.lightCycleTrail = true;
   return object;
 }
 
@@ -1483,6 +1496,9 @@ function sceneDebugSnapshot() {
     roomCircuitPulseSurfaces: 0,
     cityRoadSegments: 0,
     cityIntersections: 0,
+    lightCycleBikes: 0,
+    lightCycleTrails: 0,
+    animatedLightCycles: 0,
   };
   scene.traverse((object) => {
     if (object.isPointLight) {
@@ -1506,6 +1522,15 @@ function sceneDebugSnapshot() {
     if (object.userData.cityIntersection) {
       snapshot.cityIntersections += 1;
     }
+    if (object.userData.lightCycleBike) {
+      snapshot.lightCycleBikes += 1;
+    }
+    if (object.userData.lightCycleTrail) {
+      snapshot.lightCycleTrails += 1;
+    }
+    if (object.userData.animatedLightCycle) {
+      snapshot.animatedLightCycles += 1;
+    }
     if (object.userData.dataLanePart && materialDisablesDepthTest(object.material)) {
       snapshot.depthTestDisabledDataLanes += 1;
     }
@@ -1519,6 +1544,9 @@ function sceneDebugSnapshot() {
       snapshot.capsuleAgents += 1;
     }
   });
+  snapshot.animatedLightCycles = Array.from(state.lightCycles.values()).filter(
+    (lightCycle) => lightCycle.userData.animatedLightCycle,
+  ).length;
   return {
     ...snapshot,
     hasCapsuleAgents: snapshot.capsuleAgents > 0,
@@ -1601,6 +1629,112 @@ function reconcileCityRoads(topology) {
   scene.add(state.cityRoadLayer);
 }
 
+function lightCycleColorForKind(kind) {
+  return kind === "done" ? gridStudio.done : gridStudio.cyan;
+}
+
+function createLightCycle(route) {
+  const color = lightCycleColorForKind(route.kind);
+  const group = new THREE.Group();
+  group.userData.lightCycleRoute = route;
+
+  const bikeMaterial = new THREE.MeshBasicMaterial({
+    color,
+    transparent: true,
+    opacity: route.kind === "active" ? 0.96 : 0.72,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const trailMaterial = new THREE.MeshBasicMaterial({
+    color,
+    transparent: true,
+    opacity: route.kind === "active" ? 0.22 : 0.13,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+
+  const body = markLightCycleBike(new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.08, 0.16), bikeMaterial));
+  body.position.y = 0.18;
+  const nose = markLightCycleBike(new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.05, 0.08), bikeMaterial));
+  nose.position.set(0.24, 0.18, 0);
+  const trail = markLightCycleTrail(new THREE.Mesh(new THREE.BoxGeometry(Math.max(0.45, route.trailLength), 0.025, 0.08), trailMaterial));
+  trail.position.set(-route.trailLength / 2, 0.16, 0);
+
+  group.add(trail, body, nose);
+  group.userData.parts = { body, nose, trail, bikeMaterial, trailMaterial };
+  scene.add(group);
+  return group;
+}
+
+function roadForRoute(route) {
+  return state.cityRoadTopology?.horizontalRoads.find((road) => road.id === route.segmentId)
+    || state.cityRoadTopology?.verticalRoads.find((road) => road.id === route.segmentId)
+    || null;
+}
+
+function positionLightCycle(lightCycle, route, elapsed) {
+  const road = roadForRoute(route);
+  if (!road) {
+    lightCycle.visible = false;
+    return;
+  }
+  lightCycle.visible = true;
+  const phase = route.speed > 0 && !state.reducedMotion
+    ? (route.phase + elapsed * route.speed) % 1
+    : route.phase;
+  if (road.axis === "x") {
+    const x = road.startX + (road.endX - road.startX) * phase;
+    lightCycle.position.set(x, 0, road.z);
+    lightCycle.rotation.y = 0;
+  } else {
+    const z = road.startZ + (road.endZ - road.startZ) * phase;
+    lightCycle.position.set(road.x, 0, z);
+    lightCycle.rotation.y = -Math.PI / 2;
+  }
+  const parts = lightCycle.userData.parts;
+  parts.trail.visible = !state.reducedMotion;
+  parts.trailMaterial.opacity = state.reducedMotion ? 0 : route.kind === "active" ? 0.22 : 0.13;
+  lightCycle.userData.animatedLightCycle = route.speed > 0 && !state.reducedMotion;
+}
+
+function roomTrafficStates(projectGroups, placements) {
+  return projectGroups.map((projectGroup, index) => ({
+    project: projectGroup.project,
+    x: placements[index]?.x || 0,
+    z: placements[index]?.z || 0,
+    hasActiveThreads: projectGroup.threads.some((thread) => thread.state === "ACTIVE"),
+    doneCount: projectGroup.threads.filter((thread) => thread.state === "DONE").length,
+  }));
+}
+
+function reconcileLightCycles(projectGroups, placements) {
+  const topology = state.cityRoadTopology;
+  const routes = cityBikeRoutes(topology, roomTrafficStates(projectGroups, placements), {
+    viewportWidth: window.innerWidth,
+    reducedMotion: state.reducedMotion,
+  });
+  state.lightCycleRoutes = routes;
+  const activeRouteIds = new Set(routes.map((route) => route.id));
+
+  for (const [routeId, lightCycle] of state.lightCycles.entries()) {
+    if (!activeRouteIds.has(routeId)) {
+      disposeObject3D(lightCycle);
+      scene.remove(lightCycle);
+      state.lightCycles.delete(routeId);
+    }
+  }
+
+  for (const route of routes) {
+    let lightCycle = state.lightCycles.get(route.id);
+    if (!lightCycle) {
+      lightCycle = createLightCycle(route);
+      state.lightCycles.set(route.id, lightCycle);
+    }
+    lightCycle.userData.lightCycleRoute = route;
+    positionLightCycle(lightCycle, route, 0);
+  }
+}
+
 function reconcileRooms(projectGroups) {
   const activeProjects = new Set(projectGroups.map((group) => group.project));
   const roomLayouts = new Map(
@@ -1613,6 +1747,7 @@ function reconcileRooms(projectGroups) {
   const cityTopology = cityRoadTopology(roomPlacements);
   reconcileCityRoads(cityTopology);
   state.cityRoadTopology = cityTopology;
+  reconcileLightCycles(projectGroups, roomPlacements);
   for (const [project, room] of state.rooms.entries()) {
     if (!activeProjects.has(project)) {
       disposeObject3D(room);
@@ -2869,6 +3004,10 @@ function animateAgents(elapsed) {
     parts.backLightRail.material.opacity = 0.3 + pulse * 0.12 * strength;
     parts.sideLightRail.material.opacity = 0.22 + pulse * 0.08 * strength;
     parts.linkRail.material.opacity = 0.26 + pulse * 0.1 * strength;
+  }
+
+  for (const lightCycle of state.lightCycles.values()) {
+    positionLightCycle(lightCycle, lightCycle.userData.lightCycleRoute, elapsed);
   }
 }
 
