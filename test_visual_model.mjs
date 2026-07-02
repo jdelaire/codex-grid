@@ -25,10 +25,12 @@ import {
   privacyPath,
   projectRoomLayout,
   projectRoomGridSpacing,
+  projectRoomPlacements,
   projectDisplayText,
   serializeReviewedThreadIds,
   reviewStateForParentGroup,
   roomCameraFocus,
+  sceneOverviewCameraFocus,
   shouldPollThreads,
   shouldUseDenseLabels,
   STALE_AFTER_MS,
@@ -878,6 +880,46 @@ const roomSpacing = projectRoomGridSpacing([
 assert.equal(roomSpacing.gapX, 16.25);
 assert.equal(roomSpacing.gapZ, 9.75);
 assert.ok(roomSpacing.gapX > 16);
+
+const packedRoomPlacements = projectRoomPlacements([
+  { width: 18, depth: 9 },
+  { width: 10, depth: 7 },
+  { width: 9.2, depth: 6.8 },
+  { width: 9.2, depth: 6.8 },
+  { width: 10, depth: 7 },
+  { width: 9.2, depth: 6.8 },
+  { width: 9.2, depth: 6.8 },
+  { width: 9.2, depth: 6.8 },
+]);
+assert.equal(packedRoomPlacements.length, 8);
+const packedRows = new Map();
+for (const placement of packedRoomPlacements) {
+  const row = packedRows.get(placement.row) || [];
+  row.push(placement);
+  packedRows.set(placement.row, row);
+}
+assert.equal(packedRows.size, 2);
+assert.deepEqual([...packedRows.values()].map((row) => row.length), [4, 4]);
+for (const row of packedRows.values()) {
+  const minX = Math.min(...row.map((placement) => placement.x - placement.width / 2));
+  const maxX = Math.max(...row.map((placement) => placement.x + placement.width / 2));
+  assert.ok(maxX - minX < 55);
+  assert.ok(Math.abs(minX + maxX) < 0.001);
+}
+assert.ok(Math.abs(packedRoomPlacements[0].z - packedRoomPlacements[4].z) < 18);
+
+const overviewFocus = sceneOverviewCameraFocus(
+  packedRoomPlacements,
+  { x: 10, y: 10, z: 14 },
+  { x: 0, y: 0, z: 0 },
+);
+assert.deepEqual(overviewFocus.target, { x: 0, y: 0.65, z: 0 });
+assert.ok(Math.hypot(
+  overviewFocus.position.x - overviewFocus.target.x,
+  overviewFocus.position.y - overviewFocus.target.y,
+  overviewFocus.position.z - overviewFocus.target.z,
+) > 45);
+assert.ok(overviewFocus.durationMs >= 700);
 
 assert.equal(projectDisplayText("thaiquest", 27), "THAIQUEST (27)");
 assert.equal(projectDisplayText("", 3), "UNKNOWN (3)");

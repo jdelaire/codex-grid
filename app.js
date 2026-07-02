@@ -22,10 +22,11 @@ import {
   parseReviewedThreadIds,
   privacyLabel,
   projectDisplayText,
-  projectRoomGridSpacing,
   projectRoomLayout,
+  projectRoomPlacements,
   reviewStateForParentGroup,
   roomCameraFocus,
+  sceneOverviewCameraFocus,
   sceneObjectIsSelected,
   serializeReviewedThreadIds,
   shouldPollThreads,
@@ -272,18 +273,6 @@ function parentColor(thread) {
 
 function parentGroupColor(parentGroup) {
   return colorFromKey(parentGroup.colorKey || parentGroup.parentId || parentGroup.project || "thread");
-}
-
-function roomPosition(index, total, gapX = 11, gapZ = 8.5) {
-  const columns = Math.ceil(Math.sqrt(Math.max(total, 1)));
-  const rows = Math.ceil(total / columns);
-  const col = index % columns;
-  const row = Math.floor(index / columns);
-  return new THREE.Vector3(
-    (col - (columns - 1) / 2) * gapX,
-    0,
-    (row - (rows - 1) / 2) * gapZ,
-  );
 }
 
 const PROJECT_SIGN_Y = 5.6;
@@ -1304,8 +1293,7 @@ function reconcileRooms(projectGroups) {
       projectRoomLayout(projectGroup.parentGroups),
     ]),
   );
-  const layouts = [...roomLayouts.values()];
-  const roomSpacing = projectRoomGridSpacing(layouts);
+  const roomPlacements = projectRoomPlacements(projectGroups.map((projectGroup) => roomLayouts.get(projectGroup.project)));
   for (const [project, room] of state.rooms.entries()) {
     if (!activeProjects.has(project)) {
       disposeObject3D(room);
@@ -1317,12 +1305,13 @@ function reconcileRooms(projectGroups) {
   projectGroups.forEach((projectGroup, index) => {
     const { project, threads } = projectGroup;
     const layout = roomLayouts.get(project);
+    const placement = roomPlacements[index];
     let room = state.rooms.get(project);
     if (!room) {
       room = createRoom(project);
       state.rooms.set(project, room);
     }
-    room.position.copy(roomPosition(index, projectGroups.length, roomSpacing.gapX, roomSpacing.gapZ));
+    room.position.set(placement.x, 0, placement.z);
     room.userData.layout = layout;
     room.userData.hasActiveThreads = threads.some((thread) => thread.state === "ACTIVE");
     updateRoomSize(room, layout);
@@ -1815,6 +1804,22 @@ function focusInitialRoom(projectGroups) {
   if (state.hasInitialCameraFocus || state.cameraFocus || state.selectedMode) {
     return;
   }
+  if (projectGroups.length > 6) {
+    const placements = projectGroups
+      .map((projectGroup) => state.rooms.get(projectGroup.project))
+      .filter(Boolean)
+      .map((room) => ({
+        x: room.position.x,
+        z: room.position.z,
+        width: room.userData.size?.width,
+        depth: room.userData.size?.depth,
+      }));
+    if (placements.length) {
+      state.hasInitialCameraFocus = true;
+      startCameraFocus(sceneOverviewCameraFocus(placements, camera.position, controls.target));
+      return;
+    }
+  }
   const room = state.rooms.get(projectGroups[0]?.project);
   if (!room) {
     return;
@@ -2259,6 +2264,10 @@ function smoothstep(progress) {
 
 function focusCameraOnRoom(room) {
   const focus = roomCameraFocus(room.position, room.userData.size, camera.position, controls.target);
+  startCameraFocus(focus);
+}
+
+function startCameraFocus(focus) {
   state.cameraFocus = {
     startedAt: performance.now(),
     durationMs: focus.durationMs,

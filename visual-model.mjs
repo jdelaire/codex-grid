@@ -360,13 +360,66 @@ export function projectRoomLayout(parentGroups) {
   };
 }
 
+const ROOM_GRID_GUTTER_X = 2.25;
+const ROOM_GRID_GUTTER_Z = 1.75;
+
 export function projectRoomGridSpacing(layouts) {
   const maxWidth = Math.max(9.2, ...layouts.map((layout) => layout.width));
   const maxDepth = Math.max(6.8, ...layouts.map((layout) => layout.depth));
   return {
-    gapX: Number((maxWidth + 2.25).toFixed(3)),
-    gapZ: Number((maxDepth + 1.75).toFixed(3)),
+    gapX: Number((maxWidth + ROOM_GRID_GUTTER_X).toFixed(3)),
+    gapZ: Number((maxDepth + ROOM_GRID_GUTTER_Z).toFixed(3)),
   };
+}
+
+export function projectRoomPlacements(layouts) {
+  const rooms = layouts.map((layout, index) => ({
+    index,
+    width: Number(layout?.width) || 9.2,
+    depth: Number(layout?.depth) || 6.8,
+  }));
+  if (!rooms.length) {
+    return [];
+  }
+
+  const maxColumns = rooms.length > 6 ? 4 : Math.ceil(Math.sqrt(rooms.length));
+  const columns = Math.max(1, Math.min(rooms.length, maxColumns));
+  const rows = [];
+  for (let index = 0; index < rooms.length; index += columns) {
+    rows.push(rooms.slice(index, index + columns));
+  }
+
+  const rowDepths = rows.map((row) => Math.max(...row.map((room) => room.depth)));
+  const totalDepth =
+    rowDepths.reduce((total, depth) => total + depth, 0) +
+    ROOM_GRID_GUTTER_Z * Math.max(0, rows.length - 1);
+  const placements = new Array(rooms.length);
+  let rowZ = -totalDepth / 2;
+
+  rows.forEach((row, rowIndex) => {
+    const rowWidth =
+      row.reduce((total, room) => total + room.width, 0) +
+      ROOM_GRID_GUTTER_X * Math.max(0, row.length - 1);
+    let roomX = -rowWidth / 2;
+    const z = rowZ + rowDepths[rowIndex] / 2;
+
+    row.forEach((room, col) => {
+      roomX += room.width / 2;
+      placements[room.index] = {
+        x: Number(roomX.toFixed(3)),
+        z: Number(z.toFixed(3)),
+        row: rowIndex,
+        col,
+        width: room.width,
+        depth: room.depth,
+      };
+      roomX += room.width / 2 + ROOM_GRID_GUTTER_X;
+    });
+
+    rowZ += rowDepths[rowIndex] + ROOM_GRID_GUTTER_Z;
+  });
+
+  return placements;
 }
 
 export function parentGroupOffset(index, total, layout = projectRoomLayout(Array.from({ length: total }))) {
@@ -502,6 +555,24 @@ export function matchesThreadSearch(thread, query) {
   return haystack.includes(normalized);
 }
 
+function cameraOffsetForFocus(minDistance, currentCameraPosition, currentTarget) {
+  const fallbackOffset = { x: minDistance * 0.62, y: minDistance * 0.6, z: minDistance * 0.82 };
+  const offset = {
+    x: Number(currentCameraPosition?.x || 0) - Number(currentTarget?.x || 0),
+    y: Number(currentCameraPosition?.y || 0) - Number(currentTarget?.y || 0),
+    z: Number(currentCameraPosition?.z || 0) - Number(currentTarget?.z || 0),
+  };
+  const length = Math.hypot(offset.x, offset.y, offset.z);
+  if (length <= 0.001) {
+    return fallbackOffset;
+  }
+  return {
+    x: (offset.x / length) * Math.max(length, minDistance),
+    y: (offset.y / length) * Math.max(length, minDistance),
+    z: (offset.z / length) * Math.max(length, minDistance),
+  };
+}
+
 export function roomCameraFocus(roomPosition, roomSize, currentCameraPosition, currentTarget) {
   const target = {
     x: Number(roomPosition?.x || 0),
@@ -511,21 +582,7 @@ export function roomCameraFocus(roomPosition, roomSize, currentCameraPosition, c
   const width = Math.max(9.2, Number(roomSize?.width || 9.2));
   const depth = Math.max(6.8, Number(roomSize?.depth || 6.8));
   const minDistance = Math.max(11, width * 0.78, depth * 1.05);
-  const fallbackOffset = { x: minDistance * 0.62, y: minDistance * 0.6, z: minDistance * 0.82 };
-  const offset = {
-    x: Number(currentCameraPosition?.x || 0) - Number(currentTarget?.x || 0),
-    y: Number(currentCameraPosition?.y || 0) - Number(currentTarget?.y || 0),
-    z: Number(currentCameraPosition?.z || 0) - Number(currentTarget?.z || 0),
-  };
-  const length = Math.hypot(offset.x, offset.y, offset.z);
-  const cameraOffset =
-    length > 0.001
-      ? {
-          x: (offset.x / length) * Math.max(length, minDistance),
-          y: (offset.y / length) * Math.max(length, minDistance),
-          z: (offset.z / length) * Math.max(length, minDistance),
-        }
-      : fallbackOffset;
+  const cameraOffset = cameraOffsetForFocus(minDistance, currentCameraPosition, currentTarget);
 
   return {
     target,
@@ -535,6 +592,37 @@ export function roomCameraFocus(roomPosition, roomSize, currentCameraPosition, c
       z: target.z + cameraOffset.z,
     },
     durationMs: 680,
+  };
+}
+
+export function sceneOverviewCameraFocus(placements, currentCameraPosition, currentTarget) {
+  const rooms = (placements || []).filter((placement) => placement && Number.isFinite(Number(placement.x)));
+  if (!rooms.length) {
+    return roomCameraFocus({ x: 0, z: 0 }, { width: 9.2, depth: 6.8 }, currentCameraPosition, currentTarget);
+  }
+
+  const minX = Math.min(...rooms.map((room) => Number(room.x) - Math.max(9.2, Number(room.width || 9.2)) / 2));
+  const maxX = Math.max(...rooms.map((room) => Number(room.x) + Math.max(9.2, Number(room.width || 9.2)) / 2));
+  const minZ = Math.min(...rooms.map((room) => Number(room.z) - Math.max(6.8, Number(room.depth || 6.8)) / 2));
+  const maxZ = Math.max(...rooms.map((room) => Number(room.z) + Math.max(6.8, Number(room.depth || 6.8)) / 2));
+  const width = Math.max(9.2, maxX - minX);
+  const depth = Math.max(6.8, maxZ - minZ);
+  const target = {
+    x: Number(((minX + maxX) / 2).toFixed(3)),
+    y: 0.65,
+    z: Number(((minZ + maxZ) / 2).toFixed(3)),
+  };
+  const minDistance = Math.max(22, width * 0.92, depth * 1.16);
+  const cameraOffset = cameraOffsetForFocus(minDistance, currentCameraPosition, currentTarget);
+
+  return {
+    target,
+    position: {
+      x: target.x + cameraOffset.x,
+      y: target.y + cameraOffset.y,
+      z: target.z + cameraOffset.z,
+    },
+    durationMs: 760,
   };
 }
 
