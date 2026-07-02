@@ -939,6 +939,20 @@ assert.equal(Number.isFinite(malformedTopology.bounds.depth), true);
 assert.equal(malformedTopology.verticalRoads.every((road) => Number.isFinite(road.x)), true);
 assert.equal(malformedTopology.horizontalRoads.every((road) => Number.isFinite(road.z)), true);
 
+const raggedPlacements = projectRoomPlacements(Array.from({ length: 5 }, () => ({ width: 9.2, depth: 6.8 })));
+const raggedTopology = cityRoadTopology(raggedPlacements);
+for (const road of raggedTopology.verticalRoads) {
+  for (const placement of raggedPlacements) {
+    const minX = placement.x - placement.width / 2;
+    const maxX = placement.x + placement.width / 2;
+    const minZ = placement.z - placement.depth / 2;
+    const maxZ = placement.z + placement.depth / 2;
+    const overlapsRoomZ = road.startZ < maxZ && road.endZ > minZ;
+    const crossesRoomX = road.x > minX && road.x < maxX;
+    assert.equal(overlapsRoomZ && crossesRoomX, false);
+  }
+}
+
 assert.equal(cityTrafficBudget({ projectCount: 0, activeProjectCount: 0, viewportWidth: 1200 }), 0);
 assert.equal(cityTrafficBudget({ projectCount: 1, activeProjectCount: 0, viewportWidth: 1200 }), 3);
 assert.equal(cityTrafficBudget({ projectCount: 8, activeProjectCount: 4, viewportWidth: 1600 }), 16);
@@ -957,6 +971,19 @@ assert.equal(routes.some((route) => route.kind === "done"), true);
 assert.equal(routes.every((route) => route.id && route.segmentId), true);
 assert.equal(routes.every((route) => route.trailLength >= 0.7 && route.trailLength <= 1.8), true);
 assert.deepEqual(cityBikeRoutes(topology, [], { viewportWidth: 1200 }), []);
+
+const cappedActiveRoutes = cityBikeRoutes(
+  topology,
+  Array.from({ length: 20 }, (_, index) => ({
+    project: `project-${index}`,
+    x: 0,
+    z: 0,
+    hasActiveThreads: index === 19,
+    doneCount: 0,
+  })),
+  { viewportWidth: 1600 },
+);
+assert.equal(cappedActiveRoutes.some((route) => route.kind === "active" && route.roomProject === "project-19"), true);
 
 const reducedRoutes = cityBikeRoutes(topology, [
   { project: "codims", x: 0, z: 0, hasActiveThreads: true, doneCount: 0 },

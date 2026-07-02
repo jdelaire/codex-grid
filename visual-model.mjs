@@ -490,7 +490,6 @@ export function cityRoadTopology(placements) {
   const maxZ = Math.max.apply(null, boundsList.map((bounds) => bounds.maxZ)) + CITY_ROAD_MARGIN;
 
   const rowGroups = groupRoomsByIndex(rooms, "row");
-  const colGroups = groupRoomsByIndex(rooms, "col");
 
   const horizontalZ = [minZ];
   for (let index = 0; index < rowGroups.length - 1; index += 1) {
@@ -500,14 +499,6 @@ export function cityRoadTopology(placements) {
   }
   horizontalZ.push(maxZ);
 
-  const verticalX = [minX];
-  for (let index = 0; index < colGroups.length - 1; index += 1) {
-    const currentMax = Math.max.apply(null, colGroups[index][1].map((room) => roomBounds(room).maxX));
-    const nextMin = Math.min.apply(null, colGroups[index + 1][1].map((room) => roomBounds(room).minX));
-    verticalX.push(Number(((currentMax + nextMin) / 2).toFixed(3)));
-  }
-  verticalX.push(maxX);
-
   const horizontalRoads = horizontalZ.map((z) => ({
     id: roadId("h", z),
     axis: "x",
@@ -516,20 +507,55 @@ export function cityRoadTopology(placements) {
     endX: Number(maxX.toFixed(3)),
     length: Number((maxX - minX).toFixed(3)),
   }));
-  const verticalRoads = verticalX.map((x) => ({
-    id: roadId("v", x),
-    axis: "z",
-    x,
-    startZ: Number(minZ.toFixed(3)),
-    endZ: Number(maxZ.toFixed(3)),
-    length: Number((maxZ - minZ).toFixed(3)),
-  }));
+  const verticalSegments = [];
+  for (let rowIndex = 0; rowIndex < rowGroups.length; rowIndex += 1) {
+    const rowRooms = rowGroups[rowIndex][1]
+      .slice()
+      .sort((left, right) => left.x - right.x || left.col - right.col);
+    const rowBounds = rowRooms.map(roomBounds);
+    const rowVerticalX = [
+      Math.min.apply(null, rowBounds.map((bounds) => bounds.minX)) - CITY_ROAD_MARGIN,
+    ];
+    for (let index = 0; index < rowBounds.length - 1; index += 1) {
+      rowVerticalX.push(Number(((rowBounds[index].maxX + rowBounds[index + 1].minX) / 2).toFixed(3)));
+    }
+    rowVerticalX.push(Math.max.apply(null, rowBounds.map((bounds) => bounds.maxX)) + CITY_ROAD_MARGIN);
+    for (const x of rowVerticalX) {
+      verticalSegments.push({
+        x: Number(x.toFixed(3)),
+        startZ: Number(horizontalZ[rowIndex].toFixed(3)),
+        endZ: Number(horizontalZ[rowIndex + 1].toFixed(3)),
+      });
+    }
+  }
+  const verticalRoads = verticalSegments
+    .sort((left, right) => left.x - right.x || left.startZ - right.startZ)
+    .reduce((roads, segment) => {
+      const previous = roads[roads.length - 1];
+      if (previous && previous.x === segment.x && segment.startZ <= previous.endZ + 0.001) {
+        previous.endZ = Math.max(previous.endZ, segment.endZ);
+        previous.length = Number((previous.endZ - previous.startZ).toFixed(3));
+        previous.id = `${roadId("v", previous.x)}-${previous.startZ.toFixed(3)}-${previous.endZ.toFixed(3)}`;
+        return roads;
+      }
+      roads.push({
+        id: `${roadId("v", segment.x)}-${segment.startZ.toFixed(3)}-${segment.endZ.toFixed(3)}`,
+        axis: "z",
+        x: segment.x,
+        startZ: segment.startZ,
+        endZ: segment.endZ,
+        length: Number((segment.endZ - segment.startZ).toFixed(3)),
+      });
+      return roads;
+    }, []);
   const intersections = horizontalRoads.flatMap((horizontal) =>
-    verticalRoads.map((vertical) => ({
-      id: `${horizontal.id}-${vertical.id}`,
-      x: vertical.x,
-      z: horizontal.z,
-    })),
+    verticalRoads
+      .filter((vertical) => horizontal.z >= vertical.startZ - 0.001 && horizontal.z <= vertical.endZ + 0.001)
+      .map((vertical) => ({
+        id: `${horizontal.id}-${vertical.id}`,
+        x: vertical.x,
+        z: horizontal.z,
+      })),
   );
   const boundsKey = [minX, maxX, minZ, maxZ].map((value) => Number(value).toFixed(3)).join(",");
   const roomsKey = rooms
@@ -597,9 +623,17 @@ export function cityBikeRoutes(topology, roomStates = [], options = {}) {
   }
   const fullRouteCount = Math.min(budget, Math.max(2, roads.length * 2));
   const routeCount = options.reducedMotion ? Math.min(2, fullRouteCount) : fullRouteCount;
+  const prioritizedRoomStates = roomStates
+    .map((room, index) => ({ room, index }))
+    .sort((left, right) => {
+      const activeDelta = Number(right.room.hasActiveThreads) - Number(left.room.hasActiveThreads);
+      const doneDelta = Number(right.room.doneCount > 0) - Number(left.room.doneCount > 0);
+      return activeDelta || doneDelta || left.index - right.index;
+    })
+    .map((entry) => entry.room);
   const routes = [];
   for (let index = 0; index < routeCount; index += 1) {
-    const room = roomStates[index % Math.max(1, roomStates.length)] || {};
+    const room = prioritizedRoomStates[index % Math.max(1, prioritizedRoomStates.length)] || {};
     const road = nearestRoadSegment(topology, room, index) || roads[index % roads.length];
     const active = Boolean(room.hasActiveThreads);
     const done = !active && Number(room.doneCount || 0) > 0;
