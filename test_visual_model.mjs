@@ -26,6 +26,9 @@ import {
   projectRoomLayout,
   projectRoomGridSpacing,
   projectRoomPlacements,
+  cityBikeRoutes,
+  cityRoadTopology,
+  cityTrafficBudget,
   projectDisplayText,
   serializeReviewedThreadIds,
   reviewStateForParentGroup,
@@ -907,6 +910,47 @@ for (const row of packedRows.values()) {
   assert.ok(Math.abs(minX + maxX) < 0.001);
 }
 assert.ok(Math.abs(packedRoomPlacements[0].z - packedRoomPlacements[4].z) < 18);
+
+const cityPlacements = projectRoomPlacements([
+  { width: 9.2, depth: 6.8 },
+  { width: 9.2, depth: 6.8 },
+  { width: 9.2, depth: 6.8 },
+  { width: 9.2, depth: 6.8 },
+]);
+const topology = cityRoadTopology(cityPlacements);
+assert.equal(topology.horizontalRoads.length, 3);
+assert.equal(topology.verticalRoads.length, 3);
+assert.equal(topology.intersections.length, 9);
+assert.equal(topology.bounds.width > 20, true);
+assert.equal(topology.bounds.depth > 15, true);
+assert.equal(topology.key.includes("h3-v3"), true);
+
+const oneRoomTopology = cityRoadTopology([{ x: 0, z: 0, width: 9.2, depth: 6.8, row: 0, col: 0 }]);
+assert.equal(oneRoomTopology.horizontalRoads.length, 2);
+assert.equal(oneRoomTopology.verticalRoads.length, 2);
+assert.equal(oneRoomTopology.intersections.length, 4);
+
+assert.equal(cityTrafficBudget({ projectCount: 0, activeProjectCount: 0, viewportWidth: 1200 }), 0);
+assert.equal(cityTrafficBudget({ projectCount: 1, activeProjectCount: 0, viewportWidth: 1200 }), 3);
+assert.equal(cityTrafficBudget({ projectCount: 8, activeProjectCount: 4, viewportWidth: 1600 }), 16);
+assert.equal(cityTrafficBudget({ projectCount: 8, activeProjectCount: 4, viewportWidth: 390 }), 9);
+
+const routes = cityBikeRoutes(topology, [
+  { project: "codims", x: cityPlacements[0].x, z: cityPlacements[0].z, hasActiveThreads: true, doneCount: 0 },
+  { project: "hopper", x: cityPlacements[1].x, z: cityPlacements[1].z, hasActiveThreads: false, doneCount: 2 },
+  { project: "api", x: cityPlacements[2].x, z: cityPlacements[2].z, hasActiveThreads: false, doneCount: 0 },
+], { viewportWidth: 1200 });
+assert.equal(routes.length >= 4, true);
+assert.equal(routes.some((route) => route.kind === "active"), true);
+assert.equal(routes.some((route) => route.kind === "done"), true);
+assert.equal(routes.every((route) => route.id && route.segmentId), true);
+assert.equal(routes.every((route) => route.trailLength >= 0.7 && route.trailLength <= 1.8), true);
+
+const reducedRoutes = cityBikeRoutes(topology, [
+  { project: "codims", x: 0, z: 0, hasActiveThreads: true, doneCount: 0 },
+], { viewportWidth: 1200, reducedMotion: true });
+assert.equal(reducedRoutes.length, 2);
+assert.equal(reducedRoutes.every((route) => route.speed === 0), true);
 
 const overviewFocus = sceneOverviewCameraFocus(
   packedRoomPlacements,
