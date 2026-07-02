@@ -424,6 +424,7 @@ function createRoom(project) {
   group.add(insetFloor);
 
   const floorCircuits = createFloorCircuitLines(projectAccent);
+  markRoomCircuitPulseSurface(floorCircuits);
   group.add(floorCircuits);
 
   const border = new THREE.LineSegments(
@@ -523,6 +524,7 @@ function createRoom(project) {
       opacity: 0.28,
     }),
   );
+  markRoomCircuitPulseSurface(backLightRail);
   group.add(backLightRail);
 
   const sideLightRail = new THREE.Mesh(
@@ -533,6 +535,7 @@ function createRoom(project) {
       opacity: 0.18,
     }),
   );
+  markRoomCircuitPulseSurface(sideLightRail);
   group.add(sideLightRail);
 
   const roomLight = new THREE.PointLight(projectAccent, 0.18, 10, 2);
@@ -588,6 +591,7 @@ function createRoom(project) {
       opacity: 0.26,
     }),
   );
+  markRoomCircuitPulseSurface(linkRail);
   linkRail.position.set(0, 0.18, -2.86);
   group.add(linkRail);
   group.userData.parts = {
@@ -632,6 +636,8 @@ function createRoom(project) {
     pickable.userData.project = project;
   }
   group.userData.projectDisplay = { texture: signTexture, project, count: 0, privacy: state.privacy };
+  group.userData.roomPulsePhase = (hashString(project) % 100) / 100;
+  group.userData.roomPulseStrength = 0;
   updateRoomSize(group, { width: 9.2, depth: 6.8 });
 
   scene.add(group);
@@ -742,6 +748,11 @@ function markProgramDetails(...objects) {
 
 function markDataLanePart(object) {
   object.userData.dataLanePart = true;
+  return object;
+}
+
+function markRoomCircuitPulseSurface(object) {
+  object.userData.roomCircuitPulseSurface = true;
   return object;
 }
 
@@ -1290,6 +1301,8 @@ function selectedSceneObject(object) {
 function updateRoomVisualState(room, project) {
   const selected = selectedSceneObject({ type: "room", project });
   const parts = room.userData.parts;
+  const activeStrength = room.userData.hasActiveThreads ? 1 : 0;
+  room.userData.roomPulseStrength = selected ? 1 : activeStrength;
   parts.floorGlow.material.opacity = selected
     ? gridStudio.room.selectedGlowOpacity
     : gridStudio.room.floorGlowOpacity;
@@ -1300,6 +1313,13 @@ function updateRoomVisualState(room, project) {
   parts.backRail.material.opacity = selected ? 1 : gridStudio.room.railOpacity;
   parts.leftRail.material.opacity = selected ? 0.9 : gridStudio.room.railOpacity * 0.82;
   parts.rightRail.material.opacity = selected ? 0.9 : gridStudio.room.railOpacity * 0.82;
+  const circuitOpacity = selected ? 0.62 : room.userData.hasActiveThreads ? 0.5 : 0.32;
+  for (const circuit of parts.floorCircuits.children) {
+    circuit.material.opacity = circuitOpacity;
+  }
+  parts.backLightRail.material.opacity = selected ? 0.48 : room.userData.hasActiveThreads ? 0.36 : 0.22;
+  parts.sideLightRail.material.opacity = selected ? 0.38 : room.userData.hasActiveThreads ? 0.28 : 0.16;
+  parts.linkRail.material.opacity = selected ? 0.42 : room.userData.hasActiveThreads ? 0.32 : 0.2;
   parts.signBack.material.emissiveIntensity = selected ? 0.46 : 0.14;
   parts.roomLight.intensity = selected ? 1.15 : room.userData.hasActiveThreads ? 0.62 : 0.18;
   parts.selectionFrame.visible = selected;
@@ -1386,6 +1406,7 @@ function sceneDebugSnapshot() {
     programAuraRings: 0,
     activeDataLanes: 0,
     animatedDataLanes: 0,
+    roomCircuitPulseSurfaces: 0,
   };
   scene.traverse((object) => {
     if (object.isPointLight) {
@@ -1399,6 +1420,9 @@ function sceneDebugSnapshot() {
     }
     if (object.userData.programAuraRing) {
       snapshot.programAuraRings += 1;
+    }
+    if (object.userData.roomCircuitPulseSurface) {
+      snapshot.roomCircuitPulseSurfaces += 1;
     }
     if (object.userData.activeDataLane) {
       snapshot.activeDataLanes += 1;
@@ -2650,6 +2674,22 @@ function animateAgents(elapsed) {
     parts.token.rotation.y = elapsed * 0.28;
     parts.ring.scale.setScalar(selected ? Math.max(1.12, pulse) : pulse);
     parts.ringMaterial.opacity = 0.46;
+  }
+
+  for (const room of state.rooms.values()) {
+    const parts = room.userData.parts;
+    const strength = room.userData.roomPulseStrength || 0;
+    if (!strength || state.reducedMotion) {
+      continue;
+    }
+    const pulse = 0.5 + Math.sin(elapsed * 1.6 + room.userData.roomPulsePhase * Math.PI * 2) * 0.5;
+    const circuitOpacity = 0.42 + pulse * 0.16 * strength;
+    for (const circuit of parts.floorCircuits.children) {
+      circuit.material.opacity = circuitOpacity;
+    }
+    parts.backLightRail.material.opacity = 0.3 + pulse * 0.12 * strength;
+    parts.sideLightRail.material.opacity = 0.22 + pulse * 0.08 * strength;
+    parts.linkRail.material.opacity = 0.26 + pulse * 0.1 * strength;
   }
 }
 
