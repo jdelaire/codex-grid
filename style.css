@@ -387,6 +387,13 @@ p {
   box-shadow: 0 0 0 1px rgba(224, 242, 254, 0.16) inset, 0 0 18px rgba(125, 211, 252, 0.18), 0 10px 24px rgba(0, 0, 0, 0.3);
 }
 
+.agent-label.is-occluded,
+.digest-label.is-occluded,
+.parent-label.is-occluded {
+  visibility: hidden;
+  opacity: 0;
+}
+
 .inbox-drawer,
 .inspector-overlay {
   position: absolute;
@@ -682,9 +689,12 @@ p {
 }
 
 .review-toggle {
+  display: grid;
+  place-items: center;
   width: 76px;
   padding: 6px 7px;
   font-size: 12px;
+  text-align: center;
 }
 
 .review-toggle[aria-pressed="true"] {

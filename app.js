@@ -123,6 +123,10 @@ const gridStudio = {
 const PREFS_KEY = "codims.preferences.v1";
 const REVIEWED_THREADS_KEY = "codims.reviewedThreads.v1";
 const SELECTED_LABEL_BORDER = "rgba(224, 242, 254, 0.82)";
+const MAIN_GRID_SIZE = 1600;
+const MAIN_GRID_DIVISIONS = 1600;
+const MAIN_GRID_FADE_NEAR = 180;
+const MAIN_GRID_FADE_FAR = 520;
 const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 function loadPreferences() {
@@ -157,7 +161,7 @@ const state = {
   density: "normal",
   search: "",
   inboxOpen: false,
-  actionInboxFilter: "needs_review",
+  actionInboxFilter: null,
   inspectorOpen: false,
   actionInbox: buildActionInbox([]),
   reviewedThreadIds: loadReviewedThreadIds(),
@@ -210,6 +214,7 @@ function savePreferences() {
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(gridStudio.sceneBackground);
+scene.fog = new THREE.Fog(gridStudio.sceneBackground, MAIN_GRID_FADE_NEAR, MAIN_GRID_FADE_FAR);
 
 const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 1000);
 camera.position.set(10, 10, 14);
@@ -228,9 +233,13 @@ controls.enableDamping = true;
 controls.target.set(0, 0, 0);
 
 const raycaster = new THREE.Raycaster();
+const labelRaycaster = new THREE.Raycaster();
+const labelRayDirection = new THREE.Vector3();
+const labelScreenPoint = new THREE.Vector3();
 const pointer = new THREE.Vector2();
 const clock = new THREE.Clock();
 const CLICK_MOVE_LIMIT_PX = 6;
+const LABEL_OCCLUSION_MARGIN = 0.08;
 let pendingPointerPick = null;
 
 const ambient = new THREE.HemisphereLight(gridStudio.ambientSky, gridStudio.ambientGround, 0.74);
@@ -250,7 +259,7 @@ const amberFillLight = new THREE.DirectionalLight(0xff8a00, 0.34);
 amberFillLight.position.set(7, 5, -9);
 scene.add(amberFillLight);
 
-const grid = new THREE.GridHelper(240, 240, gridStudio.gridCenter, gridStudio.gridLine);
+const grid = new THREE.GridHelper(MAIN_GRID_SIZE, MAIN_GRID_DIVISIONS, gridStudio.gridCenter, gridStudio.gridLine);
 grid.position.y = -0.03;
 scene.add(grid);
 
@@ -561,7 +570,7 @@ function createRoom(project) {
     new THREE.MeshBasicMaterial({
       map: signTexture,
       transparent: true,
-      depthTest: false,
+      depthWrite: false,
     }),
   );
   signFace.position.set(0, PROJECT_SIGN_Y, -2.77);
@@ -706,6 +715,47 @@ function createLabel(className) {
   label.className = className;
   dom.labels.appendChild(label);
   return label;
+}
+
+function objectDescendsFrom(object, root) {
+  for (let current = object; current; current = current.parent) {
+    if (current === root) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function objectIsVisible(object) {
+  for (let current = object; current; current = current.parent) {
+    if (current.visible === false) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function materialBlocksLabel(material) {
+  if (!material) {
+    return true;
+  }
+  if (Array.isArray(material)) {
+    return material.some(materialBlocksLabel);
+  }
+  return !material.transparent || material.opacity === undefined || material.opacity > 0.18;
+}
+
+function objectBlocksLabel(object, ignoredRoot) {
+  if (ignoredRoot && objectDescendsFrom(object, ignoredRoot)) {
+    return false;
+  }
+  if (!objectIsVisible(object)) {
+    return false;
+  }
+  if (object.userData.glowShell || object.userData.dataLanePart || object.userData.roomCircuitPulseSurface) {
+    return false;
+  }
+  return materialBlocksLabel(object.material);
 }
 
 function createProgramGlowShell(geometry, color, opacity = 0.16) {
@@ -1162,7 +1212,7 @@ function createHandoff() {
     color: gridStudio.cyan,
     transparent: true,
     opacity: 0.1,
-    depthTest: false,
+    depthWrite: false,
     blending: THREE.AdditiveBlending,
   });
   const line = new THREE.Line(geometry, lineMaterial);
@@ -1172,7 +1222,7 @@ function createHandoff() {
     color: gridStudio.cyan,
     transparent: true,
     opacity: 0.92,
-    depthTest: false,
+    depthWrite: false,
     blending: THREE.AdditiveBlending,
   });
   const packet = new THREE.Mesh(new THREE.SphereGeometry(0.11, 16, 12), packetMaterial);
@@ -1182,7 +1232,7 @@ function createHandoff() {
     color: gridStudio.cyan,
     transparent: true,
     opacity: 0.24,
-    depthTest: false,
+    depthWrite: false,
     blending: THREE.AdditiveBlending,
   });
   const beam = new THREE.Mesh(curveTubeGeometry(curve, 0.024), beamMaterial);
@@ -1192,7 +1242,6 @@ function createHandoff() {
     color: gridStudio.cyan,
     transparent: true,
     opacity: 0.1,
-    depthTest: false,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
   });
@@ -1202,7 +1251,6 @@ function createHandoff() {
     color: gridStudio.cyan,
     transparent: true,
     opacity: 0.24,
-    depthTest: false,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
   });
@@ -1296,6 +1344,16 @@ function currentSceneSelection() {
 
 function selectedSceneObject(object) {
   return sceneObjectIsSelected(currentSceneSelection(), object);
+}
+
+function materialDisablesDepthTest(material) {
+  if (!material) {
+    return false;
+  }
+  if (Array.isArray(material)) {
+    return material.some(materialDisablesDepthTest);
+  }
+  return material.depthTest === false;
 }
 
 function updateRoomVisualState(room, project) {
@@ -1406,6 +1464,7 @@ function sceneDebugSnapshot() {
     programAuraRings: 0,
     activeDataLanes: 0,
     animatedDataLanes: 0,
+    depthTestDisabledDataLanes: 0,
     roomCircuitPulseSurfaces: 0,
   };
   scene.traverse((object) => {
@@ -1423,6 +1482,9 @@ function sceneDebugSnapshot() {
     }
     if (object.userData.roomCircuitPulseSurface) {
       snapshot.roomCircuitPulseSurfaces += 1;
+    }
+    if (object.userData.dataLanePart && materialDisablesDepthTest(object.material)) {
+      snapshot.depthTestDisabledDataLanes += 1;
     }
     if (object.userData.activeDataLane && object.visible !== false) {
       snapshot.activeDataLanes += 1;
@@ -1754,12 +1816,13 @@ function refreshActionInbox() {
 }
 
 function visibleActionInboxItems(inbox) {
+  const hasFilter = Boolean(state.actionInboxFilter);
   const items = filterActionInboxItems(inbox, {
-    unreviewedOnly: false,
+    unreviewedOnly: !hasFilter,
     filter: state.actionInboxFilter,
     showStale: true,
   });
-  if (!state.actionInboxFilter) {
+  if (!hasFilter) {
     return items;
   }
   return items.filter((item) => item.type === state.actionInboxFilter);
@@ -1874,7 +1937,7 @@ function renderReviewLane() {
       const reviewToggleTarget = state.privacy ? "item" : item.title || "item";
       toggle.type = "button";
       toggle.className = "review-toggle";
-      toggle.textContent = item.reviewed ? "✓" : "";
+      toggle.textContent = item.reviewed ? "✓" : "Review";
       toggle.setAttribute(
         "aria-label",
         item.reviewed ? `Mark ${reviewToggleTarget} unreviewed` : `Mark ${reviewToggleTarget} reviewed`,
@@ -2518,6 +2581,30 @@ function onPointerCancel() {
   pendingPointerPick = null;
 }
 
+function isLabelOccluded(worldPosition, ignoredRoot) {
+  const targetDistance = camera.position.distanceTo(worldPosition);
+  if (targetDistance <= LABEL_OCCLUSION_MARGIN) {
+    return false;
+  }
+
+  labelRayDirection.subVectors(worldPosition, camera.position).normalize();
+  labelRaycaster.set(camera.position, labelRayDirection);
+  labelRaycaster.near = camera.near;
+  labelRaycaster.far = Math.max(camera.near, targetDistance - LABEL_OCCLUSION_MARGIN);
+
+  return labelRaycaster
+    .intersectObjects(state.selectable, false)
+    .some((hit) => objectBlocksLabel(hit.object, ignoredRoot));
+}
+
+function updateLabelPosition(label, worldPosition, width, height, ignoredRoot) {
+  labelScreenPoint.copy(worldPosition).project(camera);
+  label.style.left = `${(labelScreenPoint.x * 0.5 + 0.5) * width}px`;
+  label.style.top = `${(-labelScreenPoint.y * 0.5 + 0.5) * height}px`;
+  const outsideCameraDepth = labelScreenPoint.z < -1 || labelScreenPoint.z > 1;
+  label.classList.toggle("is-occluded", outsideCameraDepth || isLabelOccluded(worldPosition, ignoredRoot));
+}
+
 function updateLabels() {
   const width = dom.scene.clientWidth;
   const height = dom.scene.clientHeight;
@@ -2529,9 +2616,7 @@ function updateLabels() {
       continue;
     }
     vector.set(parentAgent.position.x, parentAgent.position.y + 2.38, parentAgent.position.z);
-    vector.project(camera);
-    label.style.left = `${(vector.x * 0.5 + 0.5) * width}px`;
-    label.style.top = `${(-vector.y * 0.5 + 0.5) * height}px`;
+    updateLabelPosition(label, vector, width, height, parentAgent);
   }
 
   for (const [threadId, label] of state.agentLabels.entries()) {
@@ -2540,9 +2625,7 @@ function updateLabels() {
       continue;
     }
     vector.set(agent.position.x, agent.position.y + (agent.userData.labelHeight || 1.72), agent.position.z);
-    vector.project(camera);
-    label.style.left = `${(vector.x * 0.5 + 0.5) * width}px`;
-    label.style.top = `${(-vector.y * 0.5 + 0.5) * height}px`;
+    updateLabelPosition(label, vector, width, height, agent);
   }
 
   for (const [digestKey, label] of state.digestLabels.entries()) {
@@ -2551,9 +2634,7 @@ function updateLabels() {
       continue;
     }
     vector.set(digestObject.position.x, digestObject.position.y + 1.12, digestObject.position.z);
-    vector.project(camera);
-    label.style.left = `${(vector.x * 0.5 + 0.5) * width}px`;
-    label.style.top = `${(-vector.y * 0.5 + 0.5) * height}px`;
+    updateLabelPosition(label, vector, width, height, digestObject);
   }
 
 }

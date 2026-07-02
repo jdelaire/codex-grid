@@ -284,6 +284,7 @@ test("renders nonblank scene and action inbox", async ({ page }) => {
   expect(sceneDebug.glowShells).toBeGreaterThanOrEqual(3);
   expect(sceneDebug.activeDataLanes).toBeGreaterThanOrEqual(1);
   expect(sceneDebug.animatedDataLanes).toBeGreaterThanOrEqual(1);
+  expect(sceneDebug.depthTestDisabledDataLanes).toBe(0);
   expect(sceneDebug.programAuraRings).toBeGreaterThanOrEqual(2);
   expect(sceneDebug.roomCircuitPulseSurfaces).toBeGreaterThanOrEqual(1);
   await expect(page.locator("#inboxBadge")).toHaveText("2");
@@ -294,13 +295,14 @@ test("renders nonblank scene and action inbox", async ({ page }) => {
   await expect(page.locator("#inboxDrawer")).toBeVisible();
   await expect(page.locator('[data-action-inbox-filter="needs_review"]')).toHaveAttribute(
     "aria-pressed",
-    "true",
+    "false",
   );
   await expect(page.locator("#reviewList")).toContainText("Review sidebar");
+  await expect(page.locator("#reviewList")).toContainText("Ship Codims");
   await expect(page.locator("#reviewPanelToggle")).toHaveCount(0);
   await expect(page.locator("#reviewStaleToggle")).toHaveCount(0);
   await expect(page.locator("#reviewUnreviewedToggle")).toHaveCount(0);
-  await expect(page.locator(".review-item.is-running")).toHaveCount(0);
+  await expect(page.locator(".review-item.is-running")).toHaveCount(1);
   await page.locator('[data-action-inbox-filter="running"]').click();
   await expect(page.locator('[data-action-inbox-filter="running"]')).toHaveAttribute(
     "aria-pressed",
@@ -318,6 +320,9 @@ test("renders nonblank scene and action inbox", async ({ page }) => {
   await expect(
     page.locator(".review-item").filter({ hasText: "Review sidebar" }).locator(".review-toggle"),
   ).toHaveAttribute("aria-label", /Mark .* reviewed/);
+  await expect(
+    page.locator(".review-item").filter({ hasText: "Review sidebar" }).locator(".review-toggle"),
+  ).toHaveText("Review");
   await page.locator("#inboxClose").click();
   await expect(page.locator("#inboxDrawer")).toBeHidden();
   await expect(page.locator("#inboxToggle")).toHaveAttribute("aria-expanded", "false");

@@ -529,7 +529,7 @@ class ServerThreadPayloadTests(unittest.TestCase):
     def test_invalid_query_values_fall_back_to_defaults(self):
         self.assertEqual(
             server.parse_thread_params({"activeMinutes": ["bad"], "maxAgeHours": ["-2"]}),
-            (1.0, 8.0),
+            (3.0, 8.0),
         )
 
     def test_age_seconds_returns_truncated_non_negative_int(self):
