@@ -1676,6 +1676,7 @@ function positionLightCycle(lightCycle, route, elapsed) {
   const road = roadForRoute(route);
   if (!road) {
     lightCycle.visible = false;
+    lightCycle.userData.animatedLightCycle = false;
     return;
   }
   lightCycle.visible = true;
