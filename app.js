@@ -10,6 +10,7 @@ import {
   buildParentTimeline,
   buildProjectParentGroups,
   childVisualLayout,
+  cityRoadTopology,
   densityScale,
   filterActionInboxItems,
   fetchMaxAgeCovers,
@@ -185,6 +186,12 @@ const state = {
   digestObjects: new Map(),
   digestLabels: new Map(),
   handoffs: new Map(),
+  cityRoadLayer: null,
+  cityRoadTopologyKey: null,
+  cityRoadSegments: new Map(),
+  cityIntersections: new Map(),
+  lightCycles: new Map(),
+  lightCycleRoutes: [],
   detailCache: new Map(),
   detailSeq: 0,
   refreshing: false,
@@ -803,6 +810,16 @@ function markDataLanePart(object) {
 
 function markRoomCircuitPulseSurface(object) {
   object.userData.roomCircuitPulseSurface = true;
+  return object;
+}
+
+function markCityRoadSegment(object) {
+  object.userData.cityRoadSegment = true;
+  return object;
+}
+
+function markCityIntersection(object) {
+  object.userData.cityIntersection = true;
   return object;
 }
 
@@ -1466,6 +1483,8 @@ function sceneDebugSnapshot() {
     animatedDataLanes: 0,
     depthTestDisabledDataLanes: 0,
     roomCircuitPulseSurfaces: 0,
+    cityRoadSegments: 0,
+    cityIntersections: 0,
   };
   scene.traverse((object) => {
     if (object.isPointLight) {
@@ -1482,6 +1501,12 @@ function sceneDebugSnapshot() {
     }
     if (object.userData.roomCircuitPulseSurface) {
       snapshot.roomCircuitPulseSurfaces += 1;
+    }
+    if (object.userData.cityRoadSegment) {
+      snapshot.cityRoadSegments += 1;
+    }
+    if (object.userData.cityIntersection) {
+      snapshot.cityIntersections += 1;
     }
     if (object.userData.dataLanePart && materialDisablesDepthTest(object.material)) {
       snapshot.depthTestDisabledDataLanes += 1;
@@ -1506,6 +1531,78 @@ function sceneDebugSnapshot() {
 
 window.__codimsSceneDebug = sceneDebugSnapshot;
 
+function createRoadMaterial(opacity = 0.34) {
+  return new THREE.MeshBasicMaterial({
+    color: gridStudio.cyan,
+    transparent: true,
+    opacity,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+}
+
+function createCityRoadLayer(topology) {
+  const layer = new THREE.Group();
+  layer.name = "GridCityRoads";
+  layer.userData.cityRoadLayer = true;
+
+  for (const road of topology.horizontalRoads) {
+    const mesh = markCityRoadSegment(new THREE.Mesh(
+      new THREE.BoxGeometry(Math.max(0.1, road.length), 0.018, 0.18),
+      createRoadMaterial(0.28),
+    ));
+    mesh.position.set((road.startX + road.endX) / 2, 0.055, road.z);
+    mesh.userData.roadId = road.id;
+    mesh.userData.axis = road.axis;
+    layer.add(mesh);
+    state.cityRoadSegments.set(road.id, mesh);
+  }
+
+  for (const road of topology.verticalRoads) {
+    const mesh = markCityRoadSegment(new THREE.Mesh(
+      new THREE.BoxGeometry(0.18, 0.018, Math.max(0.1, road.length)),
+      createRoadMaterial(0.28),
+    ));
+    mesh.position.set(road.x, 0.055, (road.startZ + road.endZ) / 2);
+    mesh.userData.roadId = road.id;
+    mesh.userData.axis = road.axis;
+    layer.add(mesh);
+    state.cityRoadSegments.set(road.id, mesh);
+  }
+
+  const nodeMaterial = new THREE.MeshBasicMaterial({
+    color: gridStudio.cyan,
+    transparent: true,
+    opacity: 0.48,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  for (const intersection of topology.intersections) {
+    const node = markCityIntersection(new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.025, 16), nodeMaterial));
+    node.position.set(intersection.x, 0.07, intersection.z);
+    node.userData.intersectionId = intersection.id;
+    layer.add(node);
+    state.cityIntersections.set(intersection.id, node);
+  }
+
+  return layer;
+}
+
+function reconcileCityRoads(topology) {
+  if (state.cityRoadTopologyKey === topology.key && state.cityRoadLayer) {
+    return;
+  }
+  if (state.cityRoadLayer) {
+    disposeObject3D(state.cityRoadLayer);
+    scene.remove(state.cityRoadLayer);
+  }
+  state.cityRoadSegments.clear();
+  state.cityIntersections.clear();
+  state.cityRoadTopologyKey = topology.key;
+  state.cityRoadLayer = createCityRoadLayer(topology);
+  scene.add(state.cityRoadLayer);
+}
+
 function reconcileRooms(projectGroups) {
   const activeProjects = new Set(projectGroups.map((group) => group.project));
   const roomLayouts = new Map(
@@ -1515,6 +1612,9 @@ function reconcileRooms(projectGroups) {
     ]),
   );
   const roomPlacements = projectRoomPlacements(projectGroups.map((projectGroup) => roomLayouts.get(projectGroup.project)));
+  const cityTopology = cityRoadTopology(roomPlacements);
+  reconcileCityRoads(cityTopology);
+  state.cityRoadTopology = cityTopology;
   for (const [project, room] of state.rooms.entries()) {
     if (!activeProjects.has(project)) {
       disposeObject3D(room);
