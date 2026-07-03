@@ -31,6 +31,7 @@ import {
   cityBikeRoutes,
   cityRoadTopology,
   cityTrafficBudget,
+  digestVisualLayout,
   projectDisplayText,
   serializeReviewedThreadIds,
   reviewStateForParentGroup,
@@ -894,6 +895,22 @@ for (let index = 0; index < 96; index += 1) {
   assert.ok(Math.abs(crowdedParent.x + agent.x) + footprint <= crowdedLayout.width / 2);
   assert.ok(Math.abs(crowdedParent.z + agent.z) + footprint <= crowdedLayout.depth / 2);
 }
+
+const largeDigestGroup = { key: "large-digest", children: Array.from({ length: 16 }), finishedCount: 50 };
+const largeDigest = digestVisualLayout(largeDigestGroup);
+for (let index = 0; index < largeDigestGroup.children.length; index += 1) {
+  const agent = childVisualLayout(index, largeDigestGroup.children.length);
+  const clearance =
+    Math.hypot(largeDigest.x - agent.x, largeDigest.z - agent.z) -
+    largeDigest.radius -
+    0.48 * agent.scale;
+  assert.ok(clearance >= 0.25);
+}
+
+const largeDigestLayout = projectRoomLayout([largeDigestGroup]);
+const largeDigestParent = parentGroupOffset(0, 1, largeDigestLayout);
+assert.ok(Math.abs(largeDigestParent.x + largeDigest.x) + largeDigest.radius <= largeDigestLayout.width / 2);
+assert.ok(Math.abs(largeDigestParent.z + largeDigest.z) + largeDigest.radius <= largeDigestLayout.depth / 2);
 
 const multiTeamLayout = projectRoomLayout([
   { key: "left", children: Array.from({ length: 64 }) },

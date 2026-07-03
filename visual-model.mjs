@@ -2,6 +2,10 @@ export const STALE_AFTER_MS = 30 * 60 * 1000;
 export const STALE_INBOX_FETCH_HOURS = 24;
 export const DONE_ARTIFACT_MAX_COUNT = 50;
 export const DONE_ARTIFACT_MAX_SCALE = 10;
+const CHILD_AGENT_FOOTPRINT_RADIUS = 0.48;
+const DIGEST_ARTIFACT_FOOTPRINT_RADIUS = 0.48;
+const DIGEST_CHILD_GAP = 0.72;
+const DIGEST_Z_OFFSET = -0.85;
 
 export function buildProjectParentGroups(threads) {
   const projects = new Map();
@@ -360,13 +364,31 @@ export function childVisualLayoutEntries(children = []) {
     }));
 }
 
+function childLayoutRadius(childCount) {
+  if (childCount <= 0) {
+    return 1.2;
+  }
+  return childVisualLayout(childCount - 1, childCount).radius;
+}
+
+export function digestVisualLayout(parentGroup = {}) {
+  const childCount = parentGroup.children?.length || 0;
+  const childRadius = childLayoutRadius(childCount);
+  const artifactRadius = DIGEST_ARTIFACT_FOOTPRINT_RADIUS * doneArtifactScale(parentGroup.finishedCount);
+  return {
+    x: Number((childRadius + artifactRadius + DIGEST_CHILD_GAP).toFixed(3)),
+    z: DIGEST_Z_OFFSET,
+    radius: Number(artifactRadius.toFixed(3)),
+  };
+}
+
 export function projectRoomLayout(parentGroups) {
   const count = Math.max(parentGroups.length, 1);
   const cols = Math.min(3, Math.ceil(Math.sqrt(count)));
   const rows = Math.ceil(count / cols);
   const maxRadius = Math.max(
     2.2,
-    ...parentGroups.map((parentGroup) => parentGroupRadius(parentGroup.children?.length || 0)),
+    ...parentGroups.map((parentGroup) => parentGroupRadius(parentGroup)),
   );
   const cellWidth = Math.max(6.4, maxRadius * 2 + 1.4);
   const cellDepth = Math.max(4.35, maxRadius * 2 + 1.4);
@@ -1003,12 +1025,20 @@ function ringCapacity(ring) {
   return 8 * (ring + 1);
 }
 
-function parentGroupRadius(childCount) {
-  if (childCount <= 0) {
-    return 1.2;
+function parentGroupRadius(parentGroup = {}) {
+  const childCount = parentGroup.children?.length || 0;
+  const childRadius = childLayoutRadius(childCount);
+  const childFootprint =
+    childCount <= 0
+      ? childRadius
+      : childRadius + CHILD_AGENT_FOOTPRINT_RADIUS * childVisualLayout(childCount - 1, childCount).scale;
+  const finishedCount = Number(parentGroup.finishedCount);
+  if (!Number.isFinite(finishedCount) || finishedCount <= 0) {
+    return childFootprint;
   }
-  const outer = childVisualLayout(childCount - 1, childCount);
-  return outer.radius + 0.48 * outer.scale;
+  const digest = digestVisualLayout(parentGroup);
+  const digestFootprint = Math.hypot(digest.x, digest.z) + digest.radius;
+  return Math.max(childFootprint, digestFootprint);
 }
 
 function compareDigestThreads(left, right) {

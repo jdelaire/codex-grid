@@ -14,6 +14,7 @@ import {
   cityBikeRoutes,
   cityRoadTopology,
   densityScale,
+  digestVisualLayout,
   doneArtifactScale,
   filterActionInboxItems,
   fetchMaxAgeCovers,
@@ -1147,9 +1148,8 @@ function createAgent(thread) {
 }
 
 function digestPosition(parentPosition, parentGroup) {
-  const childCount = parentGroup.children?.length || 0;
-  const radius = childCount > 0 ? childVisualLayout(childCount - 1, childCount).radius : 1.2;
-  return parentPosition.clone().add(new THREE.Vector3(radius + 0.55, 0, -0.85));
+  const { x, z } = digestVisualLayout(parentGroup);
+  return parentPosition.clone().add(new THREE.Vector3(x, 0, z));
 }
 
 function createDigestObject(parentGroup) {
