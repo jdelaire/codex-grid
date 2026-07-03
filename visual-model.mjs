@@ -1,5 +1,7 @@
 export const STALE_AFTER_MS = 30 * 60 * 1000;
 export const STALE_INBOX_FETCH_HOURS = 24;
+export const DONE_ARTIFACT_MAX_COUNT = 50;
+export const DONE_ARTIFACT_MAX_SCALE = 10;
 
 export function buildProjectParentGroups(threads) {
   const projects = new Map();
@@ -749,6 +751,14 @@ export function projectDisplayText(project, count) {
 
 export function densityScale(density) {
   return density === "compact" ? 0.78 : 1;
+}
+
+export function doneArtifactScale(finishedCount) {
+  const count = Number(finishedCount);
+  if (!Number.isFinite(count)) {
+    return 1;
+  }
+  return 1 + (DONE_ARTIFACT_MAX_SCALE - 1) * (clamp(count, 0, DONE_ARTIFACT_MAX_COUNT) / DONE_ARTIFACT_MAX_COUNT);
 }
 
 export function privacyLabel(value, privacyMode) {

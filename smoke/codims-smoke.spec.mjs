@@ -318,6 +318,7 @@ test("renders nonblank scene and action inbox", async ({ page }) => {
   expect(sceneDebug.reviewBeams).toBeGreaterThanOrEqual(1);
   expect(sceneDebug.visibleReviewBeams).toBe(2);
   expect(sceneDebug.reviewBeamParticleFields).toBeGreaterThanOrEqual(2);
+  expect(sceneDebug.doneArtifactScales).toEqual(expect.arrayContaining([1.18, 1.36]));
   await page.locator("#settingsToggle").click();
   await page.locator("#inactiveToggle").click();
   await expect(page.locator('.agent-label[data-thread-id="child-done"]')).toHaveCount(1);

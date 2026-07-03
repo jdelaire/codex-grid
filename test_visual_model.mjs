@@ -11,6 +11,7 @@ import {
   childHandoffOffset,
   childVisualLayout,
   densityScale,
+  doneArtifactScale,
   actionInboxFetchMaxAgeHours,
   fetchMaxAgeCovers,
   filterThreadsByMaxAge,
@@ -198,6 +199,12 @@ assert.equal(privacyPath("/repo/app", true), "Hidden");
 assert.equal(densityScale("normal"), 1);
 assert.equal(densityScale("compact"), 0.78);
 assert.equal(densityScale("bad"), 1);
+assert.equal(doneArtifactScale(0), 1);
+assert.equal(doneArtifactScale(1), 1.18);
+assert.equal(doneArtifactScale(25), 5.5);
+assert.equal(doneArtifactScale(50), 10);
+assert.equal(doneArtifactScale(60), 10);
+assert.equal(doneArtifactScale("bad"), 1);
 assert.equal(autoDensityMode([]), "normal");
 assert.equal(autoDensityMode([{ threads: new Array(24).fill({}) }]), "normal");
 assert.equal(autoDensityMode([{ threads: new Array(25).fill({}) }]), "compact");

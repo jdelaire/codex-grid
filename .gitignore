@@ -21,3 +21,4 @@ dist/
 build/
 playwright-report/
 test-results/
+output/

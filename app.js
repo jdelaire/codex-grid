@@ -14,6 +14,7 @@ import {
   cityBikeRoutes,
   cityRoadTopology,
   densityScale,
+  doneArtifactScale,
   filterActionInboxItems,
   fetchMaxAgeCovers,
   filterThreadsByMaxAge,
@@ -1154,6 +1155,9 @@ function digestPosition(parentPosition, parentGroup) {
 function createDigestObject(parentGroup) {
   const group = new THREE.Group();
   group.userData.digestKey = parentGroup.key;
+  const artifact = new THREE.Group();
+  artifact.userData.doneArtifactRoot = true;
+  group.add(artifact);
 
   const baseMaterial = new THREE.MeshStandardMaterial({
     color: 0x07111b,
@@ -1179,22 +1183,23 @@ function createDigestObject(parentGroup) {
   const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.42, 0.18, 28), baseMaterial);
   pedestal.position.y = 0.12;
   pedestal.castShadow = true;
-  group.add(pedestal);
+  artifact.add(pedestal);
 
   const token = new THREE.Mesh(new THREE.DodecahedronGeometry(0.28, 0), tokenMaterial);
   token.position.y = 0.48;
   token.castShadow = true;
-  group.add(token);
+  artifact.add(token);
 
   const ring = new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.018, 8, 48), ringMaterial);
   ring.rotation.x = Math.PI / 2;
   ring.position.y = 0.22;
-  group.add(ring);
+  artifact.add(ring);
 
   const reviewBeam = createReviewBeam();
   group.add(reviewBeam);
 
   group.userData.parts = {
+    artifact,
     pedestal,
     token,
     ring,
@@ -1694,6 +1699,7 @@ function sceneDebugSnapshot() {
     reviewBeams: 0,
     visibleReviewBeams: 0,
     reviewBeamParticleFields: 0,
+    doneArtifactScales: [],
   };
   scene.traverse((object) => {
     if (object.isPointLight) {
@@ -1734,6 +1740,9 @@ function sceneDebugSnapshot() {
     }
     if (object.userData.reviewBeamParticles && object.visible !== false) {
       snapshot.reviewBeamParticleFields += 1;
+    }
+    if (object.userData.doneArtifactRoot) {
+      snapshot.doneArtifactScales.push(Number(object.scale.x.toFixed(3)));
     }
     if (object.userData.dataLanePart && materialDisablesDepthTest(object.material)) {
       snapshot.depthTestDisabledDataLanes += 1;
@@ -2137,6 +2146,9 @@ function reconcileAgents(projectGroups) {
         state.digestLabels.set(parentGroup.key, createLabel("digest-label"));
       }
       digestObject.position.copy(digestPosition(parentPosition, parentGroup));
+      const doneScale = doneArtifactScale(parentGroup.finishedCount);
+      digestObject.userData.doneArtifactScale = doneScale;
+      digestObject.userData.parts.artifact.scale.setScalar(doneScale);
       const digestReviewState = reviewStateForParentGroup(parentGroup, state.reviewedThreadIds);
       updateDigestObjectReviewState(digestObject, digestReviewState);
       updateDigestPickables(digestObject, parentGroup, room);
@@ -3094,7 +3106,11 @@ function updateLabels() {
     if (!digestObject) {
       continue;
     }
-    vector.set(digestObject.position.x, digestObject.position.y + 1.12, digestObject.position.z);
+    vector.set(
+      digestObject.position.x,
+      digestObject.position.y + 1.12 * (digestObject.userData.doneArtifactScale || 1),
+      digestObject.position.z,
+    );
     updateLabelPosition(label, vector, width, height, digestObject);
   }
 
