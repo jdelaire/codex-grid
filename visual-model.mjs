@@ -746,7 +746,7 @@ export function parentVisualLayoutEntries(parentGroups = [], layout = projectRoo
 
 export function projectDisplayText(project, count) {
   const name = String(project || "unknown").trim() || "unknown";
-  return `${name.toUpperCase()} (${count})`;
+  return name;
 }
 
 export function densityScale(density) {

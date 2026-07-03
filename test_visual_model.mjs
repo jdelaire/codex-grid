@@ -1057,8 +1057,8 @@ assert.ok(Math.hypot(
 ) > 45);
 assert.ok(overviewFocus.durationMs >= 700);
 
-assert.equal(projectDisplayText("thaiquest", 27), "THAIQUEST (27)");
-assert.equal(projectDisplayText("", 3), "UNKNOWN (3)");
+assert.equal(projectDisplayText("ThaiQuest", 27), "ThaiQuest");
+assert.equal(projectDisplayText("", 3), "unknown");
 
 const focus = roomCameraFocus(
   { x: 20, y: 0, z: -12 },
